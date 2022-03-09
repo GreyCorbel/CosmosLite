@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;..\Module\Shared\netstandard2.1\&quot;" />
+    <Exec Command="if exist C:\TFS\DigiCertUtil.exe (&#xD;&#xA;    Echo Signing executable&#xD;&#xA;    C:\TFS\DigiCertUtil.exe sign /noinput &quot;$(TargetPath)&quot;&#xD;&#xA;)&#xD;&#xA;copy /Y &quot;$(TargetPath)&quot; &quot;..\Module\CosmosLite\Shared\netstandard2.1\&quot;" />
   </Target>
 
 </Project>
