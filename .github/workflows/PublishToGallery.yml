@@ -24,7 +24,7 @@ jobs:
     - name: Build
       shell: pwsh
       run: |
-        Copy-Item -Path "$env:GITHUB_WORKSPACE\LICENSE.TXT" -Destination "$env:GITHUB_WORKSPACE\Module\CosmosLite\" -Force
+        Copy-Item -Path "$env:GITHUB_WORKSPACE\LICENSE" -Destination "$env:GITHUB_WORKSPACE\Module\CosmosLite\LICENSE.txt" -Force
 
     - name: Publish
       #Publish to PS Gallery
