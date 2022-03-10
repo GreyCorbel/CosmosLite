@@ -8,17 +8,27 @@ function Connect-Cosmos
 .DESCRIPTION
     Sets up connection parameters to Cosmos DB.
     Does not actually perform the connection - connection is established with first request, including authentication.
-    Authentication uses by default well-know clientId of Ahzure Powershell, but can accept clientId of app registered in your own tenant. In this case, application shall have configured API permission to allow delegated access to CosmosDB resource (https://cosmos.azure.com/user_impersonation)
+    Authentication uses by default well-know clientId of Azure Powershell, but can accept clientId of app registered in your own tenant. In this case, application shall have configured API permission to allow delegated access to CosmosDB resource (https://cosmos.azure.com/user_impersonation), or - for Confidential client - RBAC role on CosmosDB account
 
 .OUTPUTS
     Connection configuration object
 
 .EXAMPLE
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com -AuthMode Interactive
 
 Description
 -----------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com
+This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Delegated auth flow
+
+.EXAMPLE
+$thumbprint = 'e827f78a78cf532eb539479d6afe9c7f703173d5'
+$appId = '1b69b00f-08f0-4798-9976-af325f7f7526'
+$cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
+Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -TenantId dhl.com -ClientId $appId -X509Certificate $cert
+
+Description
+-----------
+This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Application auth flow
 
 #>
 
@@ -45,19 +55,35 @@ This command returns configuration object for working with CosmosDB account myCo
             #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
         $ClientId = '1950a258-227b-4e31-a9cf-717495945fc2',
 
+        [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
+        [string]
+            #Client secret for ClientID
+            #Used to get access as application rather than as calling user
+        $ClientSecret,
+
+        [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]
+            #Authentication certificate for ClientID
+            #Used to get access as application rather than as calling user
+        $X509Certificate,
+
         [Parameter()]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
         $LoginApi = 'https://login.microsoftonline.com',
         
-        [Parameter()]
+        [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
         [ValidateSet('Interactive', 'DeviceCode')]
         [string]
             #How to authenticate client - via web view or via device code flow
-            #Default: web view
-        $AuthMode = 'Interactive',
+        $AuthMode,
         
+        [Parameter(ParameterSetName = 'PublicClient')]
+        [string]
+            #How to authenticate user - via web view or via device code flow
+        $UserNameHint,
+
         [Parameter()]
         [string]
             #Name of the proxy if connection to Azure has to go via proxy server
@@ -66,9 +92,6 @@ This command returns configuration object for working with CosmosDB account myCo
 
     process
     {
-        $script:AuthMode = $AuthMode
-        $script:AuthFactories = @{}
-
         switch($PSEdition)
         {
             'Core'
@@ -95,16 +118,30 @@ This command returns configuration object for working with CosmosDB account myCo
 
         $script:httpClient = new-object System.Net.Http.HttpClient
         $script:Configuration = [PSCustomObject]@{
-            Account = $AccountName
-            Database = $Database
+            AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
-            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
-            LoginApi = $LoginApi
-            TenantId = $tenantId
-            ClientId = $ClientId
-            AuthMode = $AuthMode
             RetryCount = 10
         }
+
+        $RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
+
+        if($null -eq $script:AuthFactories) {$script:AuthFactories = @{}}
+        switch($PSCmdlet.ParameterSetName)
+        {
+            'PublicClient' {
+                $script:AuthFactories[$AccountName] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
+                break;
+            }
+            'ConfidentialClientWithSecret' {
+                $script:AuthFactories[$AccountName] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
+                break;
+            }
+            'ConfidentialClientWithCertificate' {
+                $script:AuthFactories[$AccountName] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                break;
+            }
+        }
+
         $script:Configuration
     }
 }
@@ -138,12 +175,7 @@ This command retrieves configuration for specified CosmosDB account and database
         [Parameter(ValueFromPipeline)]
         [PSCustomObject]
             #Connection configuration object
-        $context = $script:Configuration,
-        [Parameter()]
-        [string]
-            #Username hint for authentication process
-            #Usually not necessary unless you are logged in under multiple identities to single tenant
-        $userName
+        $context = $script:Configuration
     )
 
     process
@@ -153,12 +185,13 @@ This command retrieves configuration for specified CosmosDB account and database
             throw "Call Connect-Cosmos first"
         }
 
-        if($null -eq $script:AuthFactories[$context.tenantId])
+        if($null -eq $script:AuthFactories[$context.AccountName])
         {
-            $script:AuthFactories[$context.tenantId] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($context.tenantId, $context.ClientId, $context.RequiredScopes, $context.LoginApi)
+            throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
+
         }
 
-        $script:AuthFactories[$context.tenantId].AuthenticateAsync($userName, $context.AuthMode).GetAwaiter().GetResult()
+        $script:AuthFactories[$context.AccountName].AuthenticateAsync().GetAwaiter().GetResult()
     }
 }
 
