@@ -5,7 +5,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <AssemblyName>GreyCorbel.PublicClient.Authentication</AssemblyName>
+    <AssemblyName>GreyCorbel.Identity.Authentication</AssemblyName>
     <RootNamespace>GreyCorbel.PublicClient.Authentication</RootNamespace>
     <Version>1.0.2</Version>
     <Authors>Jiri Formacek</Authors>

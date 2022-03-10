@@ -105,7 +105,7 @@ This command returns configuration object for working with CosmosDB account myCo
                 break;
             }
         }
-        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.1\GreyCorbel.PublicClient.Authentication.dll"
+        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.1\GreyCorbel.Identity.Authentication.dll"
 
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -129,15 +129,15 @@ This command returns configuration object for working with CosmosDB account myCo
         switch($PSCmdlet.ParameterSetName)
         {
             'PublicClient' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
+                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
                 break;
             }
             'ConfidentialClientWithSecret' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
+                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
                 break;
             }
             'ConfidentialClientWithCertificate' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.PublicClient.Authentication.AuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
                 break;
             }
         }

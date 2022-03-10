@@ -1,5 +1,5 @@
 # CosmosLite
-This simple module is specialized on data manipulation in Cosmos DB. I originally used [PlagueHO/CosmosDB](https://github.com/PlagueHO/CosmosDB), however found it too difficult, because:
+This simple module is specialized on data manipulation in Cosmos DB. I originally used [PlagueHO/CosmosDB](https://github.com/PlagueHO/CosmosDB) module, however found it too difficult, because:
 - it contains much more functionality than actually needed for data manipulation
 - dev updates are slow
 - does not support [AAD authentication and RBAC](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-setup-rbac) (yet)
@@ -7,7 +7,11 @@ This simple module is specialized on data manipulation in Cosmos DB. I originall
   - it adds props like attachments, timestamp, etc and those properties get written back to DB if you are not careful, bloating the doc with unwanted duplicate data
 
 So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authetication (no plans to add access key based auth)
-*Note*: For authentication, companion library GreyCorbel.PublicClient.Authentication is used, along with ADAL module Microsoft.Identity.Client. I don't like relying on compiled code, if someone knows how to implement public client flow and Confidential flow directly in PowerShell, I would be happy to reuse - feel free to let me know.
+
+*Note*: For authentication, companion library GreyCorbel.Identity.Authentication is used, along with ADAL module Microsoft.Identity.Client. I don't like relying on compiled code, if someone knows how to implement Public and Confidential client flows directly in PowerShell, I would be happy to reuse - feel free to let me know.
+
+I wish that Powershell would have built-in Public and Confidential client that would allow the same, so we would not have to pack dependencies and worry about MS modules version mismatches!
+
 
 ## Features
 Module offers the following features:
@@ -40,8 +44,6 @@ For Confidential client flow, use own ClientId with Client Secret or Certificate
 
 Library relies on Microsoft.Identity.Client assembly that is also packed with module. 
 
-I wish that Powershell would have built-in Public and Confidential client that would allow the same, so we would not have to pack dependencies and worry about version mismatch!
-
 Supported authentication flows for Public client are `Interactive` (via web view/browser) or `DeviceCode` (with code displayed on command line and authentication handled by user in independent browser session)
 
 Authentication library allows separate credentials for every CosmosDB account, so in single script / powershell session, you can connect to multiple CosmosDB accounts with different credentials at the same time.
@@ -71,7 +73,6 @@ Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs'
 #first request causes authentication
 #this command uses explicit context to point to DB account and get appropriate credentials
 Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs' -Context $ctx
-
 
 #invoke Cosmos query returning large resultset and measure total RU consumption
 $query = "select * from c where c.partitionKey = 'sample-docs'"

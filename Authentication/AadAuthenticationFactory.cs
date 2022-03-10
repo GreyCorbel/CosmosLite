@@ -6,7 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GreyCorbel.PublicClient.Authentication
+namespace GreyCorbel.Identity.Authentication
 {
     public enum AuthenticationMode
     {
@@ -20,7 +20,7 @@ namespace GreyCorbel.PublicClient.Authentication
         ConfidentialClient
     }
 
-    public class AuthenticationFactory
+    public class AadAuthenticationFactory
     {
         private readonly string _clientId;
         private readonly string _loginApi;
@@ -31,7 +31,7 @@ namespace GreyCorbel.PublicClient.Authentication
 
         private IPublicClientApplication _publicClientApplication;
         private IConfidentialClientApplication _confidentialClientApplication;
-        public AuthenticationFactory(
+        public AadAuthenticationFactory(
             string tenantId, 
             string clientId, 
             string [] scopes, 
@@ -53,7 +53,7 @@ namespace GreyCorbel.PublicClient.Authentication
                 .Build();
         }
 
-        public AuthenticationFactory(
+        public AadAuthenticationFactory(
             string tenantId,
             string clientId,
             string clientSecret,
@@ -72,7 +72,7 @@ namespace GreyCorbel.PublicClient.Authentication
                 .Build();
         }
 
-        public AuthenticationFactory(
+        public AadAuthenticationFactory(
             string tenantId,
             string clientId,
             X509Certificate2 clientCertificate,
