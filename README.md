@@ -8,16 +8,15 @@ This simple module is specialized on data manipulation in Cosmos DB. I originall
 
 So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authetication (no plans to add access key based auth)
 
-*Note*: For authentication, companion library GreyCorbel.Identity.Authentication is used, along with ADAL module Microsoft.Identity.Client. I don't like relying on compiled code, if someone knows how to implement Public and Confidential client flows directly in PowerShell, I would be happy to reuse - feel free to let me know.
+*Note*: For authentication, companion helper module AadAuthenticationFactory with library GreyCorbel.Identity.Authentication is used, along with ADAL module Microsoft.Identity.Client. I don't like relying on compiled code, if someone knows how to implement Public and Confidential client flows directly in PowerShell, I would be happy to reuse - feel free to let me know.
 
 I wish that Powershell would have built-in Public and Confidential client that would allow the same, so we would not have to pack dependencies and worry about MS modules version mismatches!
-
 
 ## Features
 Module offers the following features:
 - Creating, Reading, Replacing and Deleting of documents
 - Updating of docuuments via [Partial document updates API](https://docs.microsoft.com/en-us/azure/cosmos-db/partial-document-update)
-- Querying of collections
+- Querying of collections with continuation token support
 - Calling of stored procedures
 
 All operations support retrying on throttling. For all operations, it's easy to know RU charge and detailed errors when they occur.
@@ -27,7 +26,7 @@ All operations return unified response object that contains below fields:
 - `HttpCode`: Http status code returned by CosmosDB REST API
 - `Charge`: RU charge caused by request processing
 - `Data`: Payload returned by REST API (if any)
-  - For commands that return documents, contains documents returned
+  - For commands that return documents, contains document(s) returned
   - For failed requests contains detailed error message returned by CosmosDB REST API as JSON string
 - `Continuation`: in case that operation returned partial dataset, contains continuation token to be used to retrieve next page of results
   - *Note*: Continuation for stored procedures returning large datasets needs to be implemented by stored procedure logic

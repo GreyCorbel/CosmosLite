@@ -1,4 +1,4 @@
-name: CI
+name: Publish-CosmosLite
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
     paths-ignore:
       - '**'
     tags:
-      - 'v*'
+      - 'cosmos-lite_v*'
   workflow_dispatch:
 
 jobs:
@@ -35,6 +35,9 @@ jobs:
         write-host "Publishing from: $env:GITHUB_WORKSPACE\Module\CosmosLite"
         try
         {
+          $env:PSModulePath = "$env:PSModulePath;$env:GITHUB_WORKSPACE\Module"
+          "PSModulePath: $env:PSModulePath"
+
           Publish-Module -Path "$env:GITHUB_WORKSPACE\Module\CosmosLite" -NuGetApiKey "$env:SECRET"
         }
         catch
@@ -42,7 +45,7 @@ jobs:
           Write-Host "Error: $($_.Exception)"
           throw
         }
-        
+    
     - name: Create Release
       #Create a release
       id: create_release
@@ -54,4 +57,3 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-

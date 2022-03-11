@@ -81,7 +81,7 @@ This command returns configuration object for working with CosmosDB account myCo
         
         [Parameter(ParameterSetName = 'PublicClient')]
         [string]
-            #How to authenticate user - via web view or via device code flow
+            #Username hint for authentication UI
         $UserNameHint,
 
         [Parameter()]
@@ -92,21 +92,6 @@ This command returns configuration object for working with CosmosDB account myCo
 
     process
     {
-        switch($PSEdition)
-        {
-            'Core'
-            {
-                Add-type -Path "$PSScriptRoot\Shared\netcoreapp2.1\Microsoft.Identity.Client.dll"
-                break;
-            }
-            'Desktop'
-            {
-                Add-Type -Path "$PSScriptRoot\Shared\net461\Microsoft.Identity.Client.dll"
-                break;
-            }
-        }
-        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.1\GreyCorbel.Identity.Authentication.dll"
-
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
         if(-not [string]::IsNullOrWhitespace($proxy))
@@ -129,15 +114,31 @@ This command returns configuration object for working with CosmosDB account myCo
         switch($PSCmdlet.ParameterSetName)
         {
             'PublicClient' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
+                $script:AuthFactories[$AccountName] = New-AAdAuthenticationFactory `
+                    -TenantId $tenantId `
+                    -ClientId $ClientId `
+                    -RequiredScopes $RequiredScopes `
+                    -LoginApi $LoginApi `
+                    -AuthMode $AuthMode `
+                    -UserNameHint $UserNameHint
                 break;
             }
             'ConfidentialClientWithSecret' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
+                $script:AuthFactories[$AccountName] = New-AAdAuthenticationFactory `
+                    -TenantId $tenantId `
+                    -ClientId $ClientId `
+                    -ClientSecret $ClientSecret `
+                    -RequiredScopes $RequiredScopes `
+                    -LoginApi $LoginApi
                 break;
             }
             'ConfidentialClientWithCertificate' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                $script:AuthFactories[$AccountName] = New-AAdAuthenticationFactory `
+                    -TenantId $tenantId `
+                    -ClientId $ClientId `
+                    -X509Certificate $X509Certificate `
+                    -RequiredScopes $RequiredScopes `
+                    -LoginApi $LoginApi
                 break;
             }
         }
@@ -188,10 +189,9 @@ This command retrieves configuration for specified CosmosDB account and database
         if($null -eq $script:AuthFactories[$context.AccountName])
         {
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
-
         }
 
-        $script:AuthFactories[$context.AccountName].AuthenticateAsync().GetAwaiter().GetResult()
+        $script:AuthFactories[$context.AccountName] | Get-AadToken
     }
 }
 
@@ -953,3 +953,4 @@ function Get-CosmosRequest
 }
 
 #endregion
+
