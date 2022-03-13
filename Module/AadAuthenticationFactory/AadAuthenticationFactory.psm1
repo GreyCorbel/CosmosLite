@@ -79,6 +79,7 @@ This command returns AAD authentication factory for Public client auth flow with
             'Desktop'
             {
                 Add-Type -Path "$PSScriptRoot\Shared\net461\Microsoft.Identity.Client.dll"
+                Add-Type -Assembly System.Net.Http
                 break;
             }
         }
