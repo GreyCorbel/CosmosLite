@@ -82,7 +82,7 @@ This command returns AAD authentication factory for Public client auth flow with
                 break;
             }
         }
-        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.1\GreyCorbel.Identity.Authentication.dll"
+        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.0\GreyCorbel.Identity.Authentication.dll"
 
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -130,8 +130,8 @@ Command creates authentication factory and retrieves AAD token from it
     (
         [Parameter(Mandatory, ValueFromPipeline)]
         [GreyCorbel.Identity.Authentication.AadAuthenticationFactory]
-            #Connection configuration object
-        $factory
+            #AAD authentication factory created via New-AadAuthenticationFactory
+        $Factory
     )
 
     process

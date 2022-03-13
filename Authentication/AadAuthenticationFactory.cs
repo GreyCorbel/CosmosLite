@@ -8,18 +8,27 @@ using System.Threading.Tasks;
 
 namespace GreyCorbel.Identity.Authentication
 {
+    /// <summary>
+    /// Public client supported authentication flows
+    /// </summary>
     public enum AuthenticationMode
     {
         Interactive,
         DeviceCode,
     }
 
+    /// <summary>
+    /// Type of client we use for auth
+    /// </summary>
     enum AuthenticationFlow
     {
         PublicClient,
         ConfidentialClient
     }
 
+    /// <summary>
+    /// Common wrapper class for various authentication flows
+    /// </summary>
     public class AadAuthenticationFactory
     {
         private readonly string _clientId;
@@ -31,7 +40,17 @@ namespace GreyCorbel.Identity.Authentication
 
         private IPublicClientApplication _publicClientApplication;
         private IConfidentialClientApplication _confidentialClientApplication;
+        /// <summary>
+        /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
+        /// </summary>
+        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+        /// <param name="clientId">ClientId to use</param>
+        /// <param name="scopes">List of scopes that clients asks for</param>
+        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+        /// <param name="authenticationMode">Type of public client flow to use</param>
+        /// <param name="userNameHint">Which username to use in auth UI in case there may be multiple names available</param>
         public AadAuthenticationFactory(
+            
             string tenantId, 
             string clientId, 
             string [] scopes, 
@@ -53,6 +72,13 @@ namespace GreyCorbel.Identity.Authentication
                 .Build();
         }
 
+        /// <summary>
+        /// Creates factory that supporrts Confidential client flows with ClientSecret authentication
+        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+        /// <param name="clientId">ClientId to use</param>
+        /// <param name="scopes">List of scopes that clients asks for</param>
+        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+        /// <param name="clientSecret">Client secret to be used</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
@@ -72,6 +98,13 @@ namespace GreyCorbel.Identity.Authentication
                 .Build();
         }
 
+        /// <summary>
+        /// Creates factory that supporrts Confidential client flows with X509 certificate authentication
+        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+        /// <param name="clientId">ClientId to use</param>
+        /// <param name="scopes">List of scopes that clients asks for</param>
+        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+        /// <param name="clientCertificate">Client secret to be used</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
@@ -91,7 +124,10 @@ namespace GreyCorbel.Identity.Authentication
                 .Build();
         }
 
-
+        /// <summary>
+        /// Authenticates caller based on configuration provided in constructor.
+        /// </summary>
+        /// <returns>AuthenticationResult that contains tokens and other information</returns>
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
             using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
@@ -127,7 +163,7 @@ namespace GreyCorbel.Identity.Authentication
                                 }).ExecuteAsync(cts.Token);
                                 break;
                             default:
-                                throw new ArgumentException($"Unsupported authentication mode: {_authMode}");
+                                throw new ArgumentException($"Unsupported Public client authentication mode: {_authMode}");
                         }
                     }
                     return result;
@@ -137,7 +173,6 @@ namespace GreyCorbel.Identity.Authentication
             }
 
             throw new ArgumentException($"Unsupported authentication flow: {_flow}");
-
         }
     }
 }
