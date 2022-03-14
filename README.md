@@ -31,7 +31,9 @@ All operations return unified response object that contains below fields:
   - For commands that return documents, contains document(s) returned
   - For failed requests contains detailed error message returned by CosmosDB REST API as JSON string
 - `Continuation`: in case that operation returned partial dataset, contains continuation token to be used to retrieve next page of results
-  - *Note*: Continuation for stored procedures returning large datasets needs to be implemented by stored procedure logic
+  - *Notes*: 
+    - Implementation protects against oversized continuation tokens
+    - Continuation for stored procedures returning large datasets needs to be implemented by stored procedure logic
 
 ## Authentication
 Module supports OAuth authentication with AAD in Delegated and Application contexts.
