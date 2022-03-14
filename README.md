@@ -8,7 +8,9 @@ This simple module is specialized on data manipulation in Cosmos DB. I originall
 
 So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authetication (no plans to add access key based auth)
 
-*Note*: For authentication, companion helper module AadAuthenticationFactory with library GreyCorbel.Identity.Authentication is used, along with ADAL module Microsoft.Identity.Client. I don't like relying on compiled code, if someone knows how to implement Public and Confidential client flows directly in PowerShell, I would be happy to reuse - feel free to let me know.
+*Note*: Design goal was to minimize dependencies. Only dependency here is MSAL module `Microsoft.Identity.Client`, with small wrapper module `GreyCorbel.Identity.Authentication` that simplifies working with Public and Confidential client runtime. 
+
+I don't like relying on compiled code, if someone knows how to implement Public and Confidential client flows directly in PowerShell, I would be happy to reuse - feel free to let me know.
 
 I wish that Powershell would have built-in Public and Confidential client that would allow the same, so we would not have to pack dependencies and worry about MS modules version mismatches!
 
