@@ -63,7 +63,7 @@ $ctx = Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydom
 $thumbprint = 'e827f78a78cf532eb539479d6afe9c7f703173d5'
 $appId = '1b69b00f-08f0-4798-9976-af325f7f7526'
 $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -TenantId dhl.com -ClientId $appId -X509Certificate $cert
+Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -TenantId mydomain.com -ClientId $appId -X509Certificate $cert
 
 
 
@@ -82,18 +82,18 @@ $query = "select * from c where c.partitionKey = 'sample-docs'"
 $totalRU = 0
 do
 {
-  $rslt = Invoke-CosmosQuery -Query $query -PartitionKey 'sample-docs' -ContinuationToken $rslt.Continuation
+  $rslt = Invoke-CosmosQuery -Query $query -PartitionKey 'sample-docs' -Collection docs -ContinuationToken $rslt.details.Continuation
   if($rslt.IsSuccess)
   {
-    $totalRU+=$rslt.charge
+    $totalRU+=$rslt.details.charge
     $rslt.Data.Documents
   }
   else
   {
     #contains error returned by server
-    throw $rslt.data
+    throw $rslt.error
   }
-}while($null -ne $rslt.Continuation)
+}while($null -ne $rslt.details.Continuation)
 ```
 
 ## Roadmap
