@@ -11,6 +11,7 @@
     <Authors>Jiri Formacek</Authors>
     <Company>GreyCorbel Solutions</Company>
     <Product>Simple Public client authentication library</Product>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

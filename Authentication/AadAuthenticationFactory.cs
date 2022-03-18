@@ -13,7 +13,13 @@ namespace GreyCorbel.Identity.Authentication
     /// </summary>
     public enum AuthenticationMode
     {
+        /// <summary>
+        /// Interactive flow with webview or browser
+        /// </summary>
         Interactive,
+        /// <summary>
+        /// DeviceCode flow with authentication performed with code on different device
+        /// </summary>
         DeviceCode,
     }
 
@@ -74,6 +80,7 @@ namespace GreyCorbel.Identity.Authentication
 
         /// <summary>
         /// Creates factory that supporrts Confidential client flows with ClientSecret authentication
+        /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
         /// <param name="clientId">ClientId to use</param>
         /// <param name="scopes">List of scopes that clients asks for</param>
@@ -100,6 +107,7 @@ namespace GreyCorbel.Identity.Authentication
 
         /// <summary>
         /// Creates factory that supporrts Confidential client flows with X509 certificate authentication
+        /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
         /// <param name="clientId">ClientId to use</param>
         /// <param name="scopes">List of scopes that clients asks for</param>
