@@ -351,11 +351,11 @@ function Remove-CosmosDocument
     Response describing result of operation
 
 .EXAMPLE
-    Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -IsUpsert
+    Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
 Description
 -----------
-This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+This command removes document with id = '123' and partition key 'test-docs' from collection 'docs'
 #>
 
     [CmdletBinding()]
@@ -627,13 +627,13 @@ function Invoke-CosmosQuery
     $data = @()
     do
     {
-        $rsp = Invoke-CosmosQuery -Query $query -Collection 'test-docs' -ContinuationToken $rsp.Continuation
+        $rsp = Invoke-CosmosQuery -Query $query -Collection 'test-docs' -ContinuationToken $rsp.Detaails.Continuation
         if($rsp.IsSuccess)
         {
             $data += $rsp.data.Documents
         }
-        $totalRuConsumption+=$rsp.Charge
-    }while($null -ne $rsp.Continuation)
+        $totalRuConsumption+=$rsp.Details.Charge
+    }while($null -ne $rsp.Details.Continuation)
 
 Description
 -----------
@@ -722,8 +722,8 @@ function Invoke-CosmosStoredProcedure
 
 .EXAMPLE
     $params = @('123', 'test')
-        $rsp = Invoke-CosmosStoredProcedure -Name testSP -Parameters ($params | ConvertTo-Json) -Collection 'docs' -PartitionKey 'test-docs'
-        $rsp
+    $rsp = Invoke-CosmosStoredProcedure -Name testSP -Parameters ($params | ConvertTo-Json) -Collection 'docs' -PartitionKey 'test-docs'
+    $rsp
 
 Description
 -----------
