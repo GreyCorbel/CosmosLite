@@ -44,8 +44,8 @@ namespace GreyCorbel.Identity.Authentication
         private readonly AuthenticationFlow _flow;
         private readonly string _userNameHint;
 
-        private IPublicClientApplication _publicClientApplication;
-        private IConfidentialClientApplication _confidentialClientApplication;
+        private readonly IPublicClientApplication _publicClientApplication;
+        private readonly IConfidentialClientApplication _confidentialClientApplication;
         /// <summary>
         /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
         /// </summary>
@@ -135,10 +135,12 @@ namespace GreyCorbel.Identity.Authentication
         /// <summary>
         /// Authenticates caller based on configuration provided in constructor.
         /// </summary>
-        /// <returns>AuthenticationResult that contains tokens and other information</returns>
+        /// <returns>
+        /// AuthenticationResult that contains tokens and other information
+        /// </returns>
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
-            using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+            using CancellationTokenSource cts = new(TimeSpan.FromMinutes(2));
             AuthenticationResult result;
             switch(_flow)
             {
@@ -158,21 +160,16 @@ namespace GreyCorbel.Identity.Authentication
                     }
                     catch (MsalUiRequiredException)
                     {
-                        switch (_authMode)
+                        result = _authMode switch
                         {
-                            case AuthenticationMode.Interactive:
-                                result = await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token);
-                                break;
-                            case AuthenticationMode.DeviceCode:
-                                result = await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
-                                {
-                                    Console.WriteLine(callback.Message);
-                                    return Task.FromResult(0);
-                                }).ExecuteAsync(cts.Token);
-                                break;
-                            default:
-                                throw new ArgumentException($"Unsupported Public client authentication mode: {_authMode}");
-                        }
+                            AuthenticationMode.Interactive => await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token),
+                            AuthenticationMode.DeviceCode => await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
+                            {
+                                Console.WriteLine(callback.Message);
+                                return Task.FromResult(0);
+                            }).ExecuteAsync(cts.Token),
+                            _ => throw new ArgumentException($"Unsupported Public client authentication mode: {_authMode}"),
+                        };
                     }
                     return result;
 
