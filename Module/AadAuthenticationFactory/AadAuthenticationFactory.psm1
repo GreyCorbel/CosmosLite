@@ -12,7 +12,7 @@ function New-AadAuthenticationFactory
     AadAuthenticationFactory object
 
 .EXAMPLE
-New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://my-db.documents.azure.com/.default') -AuthMode Interactive
+New-AadAuthenticationFactory -TenantId mydomain.com -RequiredScopes @('https://my-db.documents.azure.com/.default') -AuthMode Interactive
 
 Description
 -----------

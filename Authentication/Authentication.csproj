@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="if exist C:\TFS\DigiCertUtil.exe (&#xD;&#xA;    Echo Signing executable&#xD;&#xA;    C:\TFS\DigiCertUtil.exe sign /noinput &quot;$(TargetPath)&quot;&#xD;&#xA;)&#xD;&#xA;copy /Y &quot;$(TargetPath)&quot; &quot;..\Module\AadAuthenticationFactory\Shared\netstandard2.0\&quot;" />
+    <Exec Command="if exist C:\TFS\DigiCertUtil.exe (&#xD;&#xA;    Echo Signing executable&#xD;&#xA;    C:\TFS\DigiCertUtil.exe sign /noinput &quot;$(TargetPath)&quot;&#xD;&#xA;)&#xD;&#xA;echo Copying $(TargetPath)&#xD;&#xA;copy /Y &quot;$(TargetPath)&quot; &quot;..\Module\AadAuthenticationFactory\Shared\netstandard2.0\&quot;&#xD;&#xA;echo Copying $(TargetDir)$(TargetName).xml&#xD;&#xA;copy /Y &quot;$(TargetDir)$(TargetName).xml&quot; &quot;..\Module\AadAuthenticationFactory\Shared\netstandard2.0\&quot;" />
   </Target>
 
 </Project>

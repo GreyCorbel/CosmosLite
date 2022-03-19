@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>GreyCorbel.Identity.Authentication</name>
+    </assembly>
+    <members>
+        <member name="T:GreyCorbel.Identity.Authentication.AuthenticationMode">
+            <summary>
+            Public client supported authentication flows
+            </summary>
+        </member>
+        <member name="F:GreyCorbel.Identity.Authentication.AuthenticationMode.Interactive">
+            <summary>
+            Interactive flow with webview or browser
+            </summary>
+        </member>
+        <member name="F:GreyCorbel.Identity.Authentication.AuthenticationMode.DeviceCode">
+            <summary>
+            DeviceCode flow with authentication performed with code on different device
+            </summary>
+        </member>
+        <member name="T:GreyCorbel.Identity.Authentication.AuthenticationFlow">
+            <summary>
+            Type of client we use for auth
+            </summary>
+        </member>
+        <member name="T:GreyCorbel.Identity.Authentication.AadAuthenticationFactory">
+            <summary>
+            Common wrapper class for various authentication flows
+            </summary>
+        </member>
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,GreyCorbel.Identity.Authentication.AuthenticationMode,System.String)">
+            <summary>
+            Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
+            </summary>
+            <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+            <param name="clientId">ClientId to use</param>
+            <param name="scopes">List of scopes that clients asks for</param>
+            <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+            <param name="authenticationMode">Type of public client flow to use</param>
+            <param name="userNameHint">Which username to use in auth UI in case there may be multiple names available</param>
+        </member>
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String,System.String[],System.String)">
+            <summary>
+            Creates factory that supporrts Confidential client flows with ClientSecret authentication
+            </summary>
+            <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+            <param name="clientId">ClientId to use</param>
+            <param name="scopes">List of scopes that clients asks for</param>
+            <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+            <param name="clientSecret">Client secret to be used</param>
+        </member>
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.Security.Cryptography.X509Certificates.X509Certificate2,System.String[],System.String)">
+            <summary>
+            Creates factory that supporrts Confidential client flows with X509 certificate authentication
+            </summary>
+            <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+            <param name="clientId">ClientId to use</param>
+            <param name="scopes">List of scopes that clients asks for</param>
+            <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+            <param name="clientCertificate">Client secret to be used</param>
+        </member>
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.AuthenticateAsync">
+            <summary>
+            Authenticates caller based on configuration provided in constructor.
+            </summary>
+            <returns>AuthenticationResult that contains tokens and other information</returns>
+        </member>
+    </members>
+</doc>
