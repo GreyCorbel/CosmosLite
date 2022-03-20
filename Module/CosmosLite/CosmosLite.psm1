@@ -106,14 +106,18 @@ This command returns configuration object for working with CosmosDB account myCo
             Add-Type -AssemblyName System.Net.Http
         }
 
-        $script:httpClient = new-object System.Net.Http.HttpClient
-        
         $ModuleManifest = Import-PowershellDataFile $PSCommandPath.Replace('.psm1', '.psd1')
+
+        $script:httpClient = new-object System.Net.Http.HttpClient
+        $script:httpClient.DefaultRequestHeaders.UserAgent.Add((new-object System.Net.Http.Headers.ProductInfoHeaderValue('GreyCorbel.CosmosLite', "$($moduleManifest.ModuleVersion)")))
+        #version of Cosmos REST API we use
+        $script:httpClient.DefaultRequestHeaders.Add('x-ms-version', '2018-12-31')
+        
         $script:Configuration = [PSCustomObject]@{
             AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
             RetryCount = 10
-            ClientAgent = "GreyCorbel.CosmosLite/$($moduleManifest.ModuleVersion)"
+            DefaultWaitTime = 1000
         }
 
         $RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
@@ -899,8 +903,11 @@ function ProcessRequestWithRetryInternal
             try {
                 $request = GetCosmosRequestInternal -rq $rq
                 $rsp = $script:httpClient.SendAsync($request).GetAwaiter().GetResult()
-                $request.Dispose()
+                
+                #success -> return result
                 if($rsp.IsSuccessStatusCode) {return (FormatCosmosResponseInternal -rsp $rsp)}
+                
+                #we're throttled -> retry
                 if($rsp.StatusCode -eq 429 -and $rq.maxRetries -gt 0)
                 {
                     $val = $null
@@ -908,15 +915,38 @@ function ProcessRequestWithRetryInternal
                     Start-Sleep -Milliseconds $wait
                     $rq.maxRetries--
                 }
+                
+                #Failure or no more retries -> return result
                 else {return (FormatCosmosResponseInternal -rsp $rsp)}
-    
             }
             finally {
                 if($null -ne $rsp) {$rsp.Dispose()}
+                if($null -ne $request) {$request.Dispose()}
             }
         } until ($false)
     }
 }
+
+function ProcessRequestInternalAsync
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [PSCustomObject]$rq
+    )
+
+    process
+    {
+        try {
+            $request = GetCosmosRequestInternal -rq $rq
+            $script:httpClient.SendAsync($request)
+        }
+        finally {
+            if($null -ne $rsp) {$rsp.Dispose()}
+        }
+    }
+}
+
 function GetCosmosRequestInternal {
     param (
         [Parameter(Mandatory)]
@@ -928,8 +958,6 @@ function GetCosmosRequestInternal {
         $retVal = New-Object System.Net.Http.HttpRequestMessage
         $retVal.Headers.TryAddWithoutValidation('Authorization', [System.Web.HttpUtility]::UrlEncode("type=aad`&ver=1.0`&sig=$($rq.AccessToken)")) | out-null
         $retVal.Headers.Add('x-ms-date', [DateTime]::UtcNow.ToString('r',[System.Globalization.CultureInfo]::GetCultureInfo('en-US')))
-        $retVal.Headers.Add('x-ms-version', '2018-12-31')
-        $retVal.Headers.Add('User-Agent', $rq.ClientAgent)
         if(-not([string]::IsNullOrEmpty($ActivityId)))
         {
             $retVal.Headers.Add('x-ms-activity-id', $ActivityId)
@@ -1019,7 +1047,6 @@ function Get-CosmosRequest
             ContentType = $null
             MaxRetries = $Context.RetryCount
             ActivityId = $ActivityId
-            ClientAgent = $context.ClientAgent
         }
     }
 }
