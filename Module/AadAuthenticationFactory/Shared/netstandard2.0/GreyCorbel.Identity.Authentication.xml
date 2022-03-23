@@ -64,7 +64,9 @@
             <summary>
             Authenticates caller based on configuration provided in constructor.
             </summary>
-            <returns>AuthenticationResult that contains tokens and other information</returns>
+            <returns>
+            AuthenticationResult that contains tokens and other information
+            </returns>
         </member>
     </members>
 </doc>
