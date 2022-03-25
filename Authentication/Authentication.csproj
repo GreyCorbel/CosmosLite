@@ -7,7 +7,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>GreyCorbel.Identity.Authentication</AssemblyName>
     <RootNamespace>GreyCorbel.PublicClient.Authentication</RootNamespace>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Authors>Jiri Formacek</Authors>
     <Company>GreyCorbel Solutions</Company>
     <Product>Simple Public client authentication library</Product>

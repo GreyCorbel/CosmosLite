@@ -37,11 +37,39 @@ namespace GreyCorbel.Identity.Authentication
     /// </summary>
     public class AadAuthenticationFactory
     {
+        /// <summary>
+        /// Tenant Id of AAD tenant that authenticates the user / app
+        /// </summary>
+        public string TenantId { get { return _tenantId; } }
+        private readonly string _tenantId;
+        /// <summary>
+        /// ClientId to be used for authentication flows
+        /// </summary>
+        public string ClientId {get {return _clientId;}}
         private readonly string _clientId;
+        /// <summary>
+        /// AAD authorization endpoint. Defaults to public AAD
+        /// </summary>
+        public string LoginApi {get {return _loginApi;}}
         private readonly string _loginApi;
+
+        /// <summary>
+        /// Scopes the factory asks for when asking for tokens
+        /// </summary>
+        public string[] Scopes {get {return _scopes;}}
         private readonly string[] _scopes;
+        
+        /// <summary>
+        /// Authentication mode for public client flows
+        /// </summary>
+        public AuthenticationMode AuthMode { get {return _authMode;}}
         private readonly AuthenticationMode _authMode;
         private readonly AuthenticationFlow _flow;
+
+        /// <summary>
+        /// UserName hint to use in authentication flows to help select proper user. Useful in case multiple accounts are logged in.
+        /// </summary>
+        public string UserName { get { return _userNameHint; } }
         private readonly string _userNameHint;
 
         private readonly IPublicClientApplication _publicClientApplication;
@@ -69,6 +97,7 @@ namespace GreyCorbel.Identity.Authentication
             _scopes = scopes;
             _authMode = authenticationMode;
             _userNameHint = userNameHint;
+            _tenantId = tenantId;
 
             _flow = AuthenticationFlow.PublicClient;
 

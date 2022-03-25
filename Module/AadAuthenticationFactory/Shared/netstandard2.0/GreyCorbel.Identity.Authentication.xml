@@ -29,6 +29,36 @@
             Common wrapper class for various authentication flows
             </summary>
         </member>
+        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.TenantId">
+            <summary>
+            Tenant Id of AAD tenant that authenticates the user / app
+            </summary>
+        </member>
+        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.ClientId">
+            <summary>
+            ClientId to be used for authentication flows
+            </summary>
+        </member>
+        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.LoginApi">
+            <summary>
+            AAD authorization endpoint. Defaults to public AAD
+            </summary>
+        </member>
+        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.Scopes">
+            <summary>
+            Scopes the factory asks for when asking for tokens
+            </summary>
+        </member>
+        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.AuthMode">
+            <summary>
+            Authentication mode for public client flows
+            </summary>
+        </member>
+        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.UserName">
+            <summary>
+            UserName hint to use in authentication flows to help select proper user. Useful in case multiple accounts are logged in.
+            </summary>
+        </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,GreyCorbel.Identity.Authentication.AuthenticationMode,System.String)">
             <summary>
             Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
