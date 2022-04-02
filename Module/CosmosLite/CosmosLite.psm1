@@ -850,7 +850,7 @@ function FormatCosmosResponseInternal
             Details = [PSCustomObject][ordered]@{
                 ActivityId = $null
                 Continuation = $null
-                Charge = -1
+                Charge = 0
                 ResourceUsage = $null
             }
         }
