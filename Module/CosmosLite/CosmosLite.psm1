@@ -777,7 +777,7 @@ This command calls stored procedure and shows result.
     process
     {
 
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type SpCall -MaxItems $MaxItems -ActivityId $activityId
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type StoredProcedure -MaxItems $MaxItems -ActivityId $activityId
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $uri = "$url/$Name"
         $rq.Uri = new-object System.Uri($uri)
@@ -787,6 +787,245 @@ This command calls stored procedure and shows result.
         ProcessRequestWithRetryInternal -rq $rq
     }
 }
+
+#endregion
+
+#region SourceControlIntegration
+
+function Add-CosmosStoredProcedure
+{
+<#
+.SYNOPSIS
+    Adds new stored procedure or replaces existing one
+
+.DESCRIPTION
+    Adds stored procedure if does not exists. If the procedure with given name already exists, request fails unless -Force is specified
+    
+.OUTPUTS
+    Response describing result of operation
+
+.EXAMPLE
+    $body = Get-Content -Raw -Path .\my_sp.js
+    Add-CosmosStoredProcedure -Name my_sp -Body $body -Collection 'docs' -Force
+
+Description
+-----------
+This command adds stored procedure with name my_sp and definition loaded from file, replacing potentially existing one
+#>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string]
+            #Name of stored procedure to add
+        $Name,
+
+        [Parameter()]
+        [string]
+            #Implementation of stored procedure
+        $Body,
+
+        [Switch]
+            #Whether or not to replace existing stored procedure
+        $Force,
+
+        [Parameter(Mandatory)]
+        [string]
+            #Name of collection to upload the stored procedure to
+        $Collection,
+
+        [Parameter()]
+        [PSCustomObject]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [string]
+            #Id to be sent with request. Server returns it on response
+        $ActivityId
+    )
+
+    begin
+    {
+        $url = "$($Context.Endpoint)/colls/$collection/sprocs"
+    }
+
+    process
+    {
+        $payload = @{
+            id = $Name
+            body = $Body
+        } | ConvertTo-Json
+
+        $rq = Get-CosmosRequest -Type Document -ActivityId $activityId
+        $rq.Uri = new-object System.Uri($url)
+        $rq.Payload = $Payload
+        UploadAppLogicInternal -rq $rq -force:$Force -activityId $ActivityId
+    }
+}
+
+function Add-CosmosUserDefinedFunction
+{
+<#
+.SYNOPSIS
+    Adds new user defined function or replaces existing one
+
+.DESCRIPTION
+    Adds user defined function if does not exists. If the function with given name already exists, request fails unless -Force is specified
+    
+.OUTPUTS
+    Response describing result of operation
+
+.EXAMPLE
+    $body = Get-Content -Raw -Path .\my_udf.js
+    Add-CosmosUserDefinedProcedure -Name my_udf -Body $body -Collection 'docs' -Force
+
+Description
+-----------
+This command adds user defined function with name my_udf and definition loaded from file, replacing potentially existing one
+#>
+[CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string]
+            #Name of UDF to add
+        $Name,
+
+        [Parameter()]
+        [string]
+            #Implementation of UDF
+        $Body,
+
+        [Switch]
+            #Whether or not to replace existing UDF
+        $Force,
+
+        [Parameter(Mandatory)]
+        [string]
+            #Name of collection to upload the UDF to
+        $Collection,
+
+        [Parameter()]
+        [PSCustomObject]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [string]
+            #Id to be sent with request. Server returns it on response
+        $ActivityId
+    )
+
+    begin
+    {
+        $url = "$($Context.Endpoint)/colls/$collection/udfs"
+    }
+
+    process
+    {
+        $payload = @{
+            id = $Name
+            body = $Body
+        } | ConvertTo-Json
+
+        $rq = Get-CosmosRequest -Type Document -ActivityId $activityId
+        $rq.Uri = new-object System.Uri($url)
+        $rq.Payload = $Payload
+        UploadAppLogicInternal -rq $rq -force:$Force -activityId $ActivityId
+    }
+}
+
+function Add-CosmosTrigger
+{
+<#
+.SYNOPSIS
+    Adds new trigger or replaces existing one
+
+.DESCRIPTION
+    Adds trigger if does not exists. If the trigger with given name already exists, request fails unless -Force is specified
+    
+.OUTPUTS
+    Response describing result of operation
+
+.EXAMPLE
+    $body = Get-Content -Raw -Path .\my_trigger.js
+    Add-CosmosTrigger -Name my_trigger -Body $body -Type Pre -Operation Create -Collection 'docs' -Force
+
+Description
+-----------
+This command adds trigger with name my_trigger and definition loaded from file for Create operation, replacing potentially existing one
+#>
+[CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string]
+            #Name of trigger to add
+        $Name,
+
+        [Parameter()]
+        [string]
+            #Implementation of trigger
+        $Body,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('All','Create','Replace','Delete')]
+        [string]
+            #Operation that fires the trigger
+        $Operation,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Pre','Post')]
+        [string]
+            #When the trigger is fired
+        $Type,
+
+        [Switch]
+            #Whether or not to replace existing trigger
+        $Force,
+
+        [Parameter(Mandatory)]
+        [string]
+            #Name of collection where to upload trigger to
+        $Collection,
+
+        [Parameter()]
+        [PSCustomObject]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [string]
+            #Id to be sent with request. Server returns it on response
+        $ActivityId
+    )
+
+    begin
+    {
+        $url = "$($Context.Endpoint)/colls/$collection/triggers"
+    }
+
+    process
+    {
+        $payload = @{
+            id = $Name
+            body = $Body
+            triggerOperation = $Operation
+            triggerType = $Type
+        } | ConvertTo-Json
+
+        $rq = Get-CosmosRequest -Type Document -ActivityId $activityId
+        $rq.Payload = $Payload
+        $rq.Uri = new-object System.Uri($url)
+        UploadAppLogicInternal -rq $rq -force:$Force -activityId $ActivityId
+    }
+}
+
+#endregion
+
+#region Others
+
 
 function Set-CosmosRetryCount
 {
@@ -831,6 +1070,35 @@ This command replaces field 'content' in root of the document with ID '123' and 
 #endregion
 
 #region CosmosLiteInternals
+
+function UploadAppLogicInternal
+{
+    param
+    (
+        [Parameter(Mandatory)]
+        $rq,
+        [switch]
+        $force,
+        [Parameter()]
+        [string]
+        $activityId
+    )
+
+    process
+    {
+        $rq.Method = [System.Net.Http.HttpMethod]::Post
+        $rq.ContentType = 'application/json'
+        $result = ProcessRequestWithRetryInternal -rq $rq
+        if(-not $result.IsSuccess -and $result.HttpCode -eq 409 -and $Force)
+        {
+            #object with the name already exists and we want to replace it -> send request to replace
+            $rq.Method = [System.Net.Http.HttpMethod]::Put
+            $result = ProcessRequestWithRetryInternal -rq $rq
+        }
+        $result
+    }
+}
+
 function FormatCosmosResponseInternal
 {
     [CmdletBinding()]
@@ -993,7 +1261,7 @@ function GetCosmosRequestInternal {
                 }
                 break;
             }
-            {$_ -in 'SpCall','Document'} {
+            {$_ -in 'StoredProcedure','Document'} {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
                 break
@@ -1023,7 +1291,7 @@ function Get-CosmosRequest
         [string]$Continuation,
         [string]$PartitionKey,
         [Parameter()]
-        [ValidateSet('Query','SpCall','Document','Other')]
+        [ValidateSet('Query','StoredProcedure','Document','Other')]
         [string]$Type = 'Other',
         [switch]$Patch,
         [PSCustomObject]$Context = $script:Configuration,
