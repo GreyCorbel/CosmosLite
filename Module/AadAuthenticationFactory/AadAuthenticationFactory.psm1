@@ -69,24 +69,6 @@ This command returns AAD authentication factory for Public client auth flow with
 
     process
     {
-        switch($PSEdition)
-        {
-            'Core'
-            {
-                Add-type -Path "$PSScriptRoot\Shared\netcoreapp2.1\Microsoft.Identity.Client.dll"
-                break;
-            }
-            'Desktop'
-            {
-                Add-Type -Path "$PSScriptRoot\Shared\net461\Microsoft.Identity.Client.dll"
-                Add-Type -Assembly System.Net.Http
-                break;
-            }
-        }
-        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.0\GreyCorbel.Identity.Authentication.dll"
-
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
         switch($PSCmdlet.ParameterSetName)
         {
             'PublicClient' {
@@ -140,3 +122,33 @@ Command creates authentication factory and retrieves AAD token from it
         $factory.AuthenticateAsync().GetAwaiter().GetResult()
     }
 }
+
+#region Internals
+function Init
+{
+    param()
+
+    process
+    {
+        switch($PSEdition)
+        {
+            'Core'
+            {
+                Add-type -Path "$PSScriptRoot\Shared\netcoreapp2.1\Microsoft.Identity.Client.dll"
+                break;
+            }
+            'Desktop'
+            {
+                Add-Type -Path "$PSScriptRoot\Shared\net461\Microsoft.Identity.Client.dll"
+                Add-Type -Assembly System.Net.Http
+                break;
+            }
+        }
+        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.0\GreyCorbel.Identity.Authentication.dll"
+
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    }
+}
+#endregion
+
+Init
