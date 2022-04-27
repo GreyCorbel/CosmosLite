@@ -100,7 +100,7 @@ function Get-AadToken
     Authentication result from AAD with tokens and other information
 
 .EXAMPLE
-$factory = New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://documents.azure.com/.default') -AuthMode Interactive
+$factory = New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://eventgrid.azure.net/.default') -AuthMode Interactive
 $factory | Get-AadToken
 
 Description
@@ -122,8 +122,121 @@ Command creates authentication factory and retrieves AAD token from it
         $factory.AuthenticateAsync().GetAwaiter().GetResult()
     }
 }
+function Test-AadToken
+{
+    <#
+.SYNOPSIS
+    Parses and validates AAD issues token
+
+.DESCRIPTION
+    Parses provided IdToken or AccessToken and checks for its validity.
+    Note that some tokens may not be properly validated - this is in case then 'nonce' field present and set in the haeder. AAD issues such tokens for Graph API and nonce is taken into consideration when validating the token.
+    See discussing at https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/issues/609 for more details.
+
+.OUTPUTS
+    Parsed token and information about its validity
+
+.EXAMPLE
+$factory = New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://eventgrid.azure.net/.default') -AuthMode Interactive
+$token = $factory | Get-AadToken
+$token.idToken | Test-AadToken | fl
+
+Description
+-----------
+Command creates authentication factory, asks it to issue token for EventGrid and parses IdToken and validates it
+
+#>
+[CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]
+        [string]
+        #IdToken or AccessToken field from token returned by Get-AadToken
+        $Token
+    )
+
+    process
+    {
+        $parts = $token.split('.')
+        if($parts.Length -ne 3)
+        {
+            throw 'Invalid format of provided token'
+        }
+        
+        $result = [PSCustomObject]@{
+            Header = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Base64UrlDecode -Data $parts[0]))) | ConvertFrom-Json
+            Payload = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Base64UrlDecode -Data $parts[1]))) | ConvertFrom-Json
+            IsValid = $false
+        }
+
+        $endpoint = $result.Payload.iss.Replace('/v2.0','/')
+
+        $signingKeys = Invoke-RestMethod -Method Get -Uri "$($endpoint)discovery/keys"
+
+        $key = $signingKeys.keys | Where-object{$_.kid -eq $result.Header.kid}
+        if($null -eq $key)
+        {
+            throw "Could not find signing key with id = $($result.Header.kid)"
+        }
+        $cert = new-object System.Security.Cryptography.X509Certificates.X509Certificate2(,[Convert]::FromBase64String($key.x5c[0]))
+        $rsa = $cert.PublicKey.Key
+
+        $payload = "$($parts[0]).$($parts[1])"
+        $dataToVerify = [System.Text.Encoding]::UTF8.GetBytes($payload)
+        $sig = Base64UrlDecode -Data $parts[2]
+        $signature = [Convert]::FromBase64String($sig)
+
+        switch($result.Header.alg)
+        {
+            'RS384' {
+                $hash = [System.Security.Cryptography.HashAlgorithmName]::SHA384
+                break;
+            }
+            'RS512' {
+                $hash = [System.Security.Cryptography.HashAlgorithmName]::SHA512
+                break;
+            }
+            default {
+                $hash = [System.Security.Cryptography.HashAlgorithmName]::SHA256
+                break;
+            }
+        }
+        $padding = [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        $result.IsValid = $rsa.VerifyData($dataToVerify,$signature,$hash,$Padding)
+        $cert.Dispose()
+        if($null -ne $result.Header.nonce)
+        {
+            Write-Verbose "Header contains nonce, so token may not be properly validated. See https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/issues/609"
+        }
+        $result.psobject.typenames.Insert(0,'GreyCorbel.Identity.Authentication.TokenValidationResult')
+        $result
+    }
+}
 
 #region Internals
+function Base64UrlDecode
+{
+    param
+    (
+        [Parameter(Mandatory,ValueFromPipeline)]
+        [string]$Data
+    )
+
+    process
+    {
+        $result = $Data
+        $result = $result.Replace('-','+').Replace('_','/')
+
+        switch($result.Length % 4)
+        {
+            0 {break;}
+            2 {$result = "$result=="; break}
+            3 {$result = "$result="; break;}
+            default {throw "Invalid data format"}
+        }
+
+        $result
+    }
+}
 function Init
 {
     param()
