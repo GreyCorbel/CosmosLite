@@ -1,6 +1,8 @@
 ﻿using Microsoft.Identity.Client;
 using System;
 using System.Linq;
+using System.Net.Http;
+using System.Reflection;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -8,18 +10,6 @@ using System.Threading.Tasks;
 
 namespace GreyCorbel.Identity.Authentication
 {
-    public enum AuthenticationMode
-    {
-        Interactive,
-        DeviceCode,
-    }
-
-    enum AuthenticationFlow
-    {
-        PublicClient,
-        ConfidentialClient
-    }
-
     public class AadAuthenticationFactory
     {
         private readonly string _clientId;
@@ -29,8 +19,18 @@ namespace GreyCorbel.Identity.Authentication
         private readonly AuthenticationFlow _flow;
         private readonly string _userNameHint;
 
-        private IPublicClientApplication _publicClientApplication;
-        private IConfidentialClientApplication _confidentialClientApplication;
+        private readonly IPublicClientApplication _publicClientApplication;
+        private readonly IConfidentialClientApplication _confidentialClientApplication;
+        private readonly ManagedIdentityClientApplication _managedIdentityClientApplication;
+        /// <summary>
+        /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
+        /// </summary>
+        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+        /// <param name="clientId">ClientId to use</param>
+        /// <param name="scopes">List of scopes that clients asks for</param>
+        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+        /// <param name="authenticationMode">Type of public client flow to use</param>
+        /// <param name="userNameHint">Which username to use in auth UI in case there may be multiple names available</param>
         public AadAuthenticationFactory(
             string tenantId, 
             string clientId, 
@@ -47,12 +47,23 @@ namespace GreyCorbel.Identity.Authentication
 
             _flow = AuthenticationFlow.PublicClient;
 
-            _publicClientApplication = PublicClientApplicationBuilder.Create(_clientId)
+            var builder = PublicClientApplicationBuilder.Create(_clientId)
                 .WithDefaultRedirectUri()
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .Build();
+                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+            
+
+            _publicClientApplication = builder.Build();
         }
 
+        /// <summary>
+        /// Creates factory that supporrts Confidential client flows with ClientSecret authentication
+        /// </summary>
+        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+        /// <param name="clientId">ClientId to use</param>
+        /// <param name="scopes">List of scopes that clients asks for</param>
+        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+        /// <param name="clientSecret">Client secret to be used</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
@@ -66,10 +77,13 @@ namespace GreyCorbel.Identity.Authentication
 
             _flow = AuthenticationFlow.ConfidentialClient;
 
-            _confidentialClientApplication = ConfidentialClientApplicationBuilder.Create(_clientId)
+
+            var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithClientSecret(clientSecret)
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .Build();
+                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+
+            _confidentialClientApplication = builder.Build();
         }
 
         public AadAuthenticationFactory(
@@ -85,10 +99,36 @@ namespace GreyCorbel.Identity.Authentication
 
             _flow = AuthenticationFlow.ConfidentialClient;
 
-            _confidentialClientApplication = ConfidentialClientApplicationBuilder.Create(_clientId)
+            var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithCertificate(clientCertificate)
-                .WithAuthority($"{_loginApi}/{tenantId}")
-                .Build();
+                .WithAuthority($"{_loginApi}/{tenantId}");
+
+            _confidentialClientApplication = builder.Build();
+        }
+
+        /// <summary>
+        /// Creates factory that supports ManagedIdentity authentication
+        /// </summary>
+        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
+        public AadAuthenticationFactory(string[] scopes)
+        {
+            _scopes = scopes;
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory());
+            _flow = AuthenticationFlow.ManagedIdentity;
+
+        }
+
+        /// <summary>
+        /// Creates factory that supports UserAssignedIdentity authentication
+        /// </summary>
+        /// <param name="clientId">AppId of User Assigned Identity</param>
+        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
+        public AadAuthenticationFactory(string clientId, string[] scopes)
+        {
+            _scopes = scopes;
+            _clientId = clientId;
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory());
+            _flow = AuthenticationFlow.UserAssignedIdentity;
         }
 
 
