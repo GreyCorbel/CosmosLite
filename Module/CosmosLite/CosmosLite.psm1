@@ -875,6 +875,9 @@ function GetCosmosRequestInternal {
                 Write-Verbose "Setting 'x-ms-documentdb-isquery' to True"
                 $retVal.Headers.Add('x-ms-documentdb-isquery', 'True')
 
+                #avoid RequestTooLarge error because of continuation token size
+                $retVal.Headers.Add('x-ms-documentdb-responsecontinuationtokenlimitinkb', '8')
+
                 if($null -ne $rq.MaxItems)
                 {
                     Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
