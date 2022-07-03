@@ -14,7 +14,6 @@ namespace GreyCorbel.Identity.Authentication
         {
             if (null == httpClient)
             {
-
                 httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("AadAuthenticationFactory", CoreAssembly.Version.ToString()));
             }
@@ -24,5 +23,4 @@ namespace GreyCorbel.Identity.Authentication
             return httpClient;
         }
     }
-
 }

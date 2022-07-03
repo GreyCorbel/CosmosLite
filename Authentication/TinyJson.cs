@@ -7,7 +7,7 @@ using System.Text;
 
 namespace GreyCorbel.Identity.Authentication
 {
-    //Source: https://github.com/zanders3/json
+    //Source and credits: https://github.com/zanders3/json
     internal static class JSONParser
     {
         [ThreadStatic] static Stack<List<string>> splitArrayPool;

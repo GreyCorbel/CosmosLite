@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 
 namespace GreyCorbel.Identity.Authentication
 {
+    /// <summary>
+    /// Main object responsible for authentication according to constructor and parameters used
+    /// </summary>
     public class AadAuthenticationFactory
     {
         private readonly string _clientId;
@@ -57,7 +60,7 @@ namespace GreyCorbel.Identity.Authentication
         }
 
         /// <summary>
-        /// Creates factory that supporrts Confidential client flows with ClientSecret authentication
+        /// Creates factory that supporrts Confidential client flows via MSAL with ClientSecret authentication
         /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
         /// <param name="clientId">ClientId to use</param>
@@ -86,6 +89,14 @@ namespace GreyCorbel.Identity.Authentication
             _confidentialClientApplication = builder.Build();
         }
 
+        /// <summary>
+        /// Constructor for Confidential client authentication flow via MSAL and X509 certificate authentication
+        /// </summary>
+        /// <param name="tenantId">Dns domain name or tenant guid</param>
+        /// <param name="clientId">Client id that represents application asking for token</param>
+        /// <param name="clientCertificate">X509 certificate with private key. Public part of certificate is expected to be registered with app registration for given client id in AAD.</param>
+        /// <param name="scopes">Scopes application asks for</param>
+        /// <param name="loginApi">AAD endpoint URL for special instance of AAD (/e.g. US Gov)</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
@@ -109,7 +120,7 @@ namespace GreyCorbel.Identity.Authentication
         /// <summary>
         /// Creates factory that supports ManagedIdentity authentication
         /// </summary>
-        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
+        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array of scopes.</param>
         public AadAuthenticationFactory(string[] scopes)
         {
             _scopes = scopes;
@@ -119,7 +130,7 @@ namespace GreyCorbel.Identity.Authentication
         }
 
         /// <summary>
-        /// Creates factory that supports UserAssignedIdentity authentication
+        /// Creates factory that supports UserAssignedIdentity authentication with provided client id
         /// </summary>
         /// <param name="clientId">AppId of User Assigned Identity</param>
         /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
@@ -127,11 +138,16 @@ namespace GreyCorbel.Identity.Authentication
         {
             _scopes = scopes;
             _clientId = clientId;
-            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory());
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory(), clientId);
             _flow = AuthenticationFlow.UserAssignedIdentity;
         }
 
-
+        /// <summary>
+        /// Returns authentication result
+        /// Microsoft says we should not instantiate directly - but how to achieve unified experience of caller without being able to return it?
+        /// </summary>
+        /// <returns cref="AuthenticationResult">Authentication result object either returned fropm MSAL libraries, or - for ManagedIdentity - constructed from Managed Identity endpoint response, as returned by cref="ManagedIdentityClientApplication.ApiVersion" version of endpoint</returns>
+        /// <exception cref="ArgumentException"></exception>
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
             using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
@@ -174,6 +190,11 @@ namespace GreyCorbel.Identity.Authentication
 
                 case AuthenticationFlow.ConfidentialClient:
                     return await _confidentialClientApplication.AcquireTokenForClient(_scopes).ExecuteAsync(cts.Token);
+                case AuthenticationFlow.ManagedIdentity:
+                    return await _managedIdentityClientApplication.AcquireTokenForClient(_scopes, cts.Token);
+                case AuthenticationFlow.UserAssignedIdentity:
+                    return await _managedIdentityClientApplication.AcquireTokenForClient(_scopes, cts.Token);
+
             }
 
             throw new ArgumentException($"Unsupported authentication flow: {_flow}");
