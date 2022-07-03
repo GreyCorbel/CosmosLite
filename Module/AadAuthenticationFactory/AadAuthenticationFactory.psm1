@@ -22,7 +22,9 @@ This command returns AAD authentication factory for Public client auth flow with
 
     param
     (
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithSecret')]
+        [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithCertificate')]
+        [Parameter(Mandatory,ParameterSetName = 'PublicClient')]
         [string]
             #Id of tenant where to autenticate the user. Can be tenant id, or any registerd DNS domain
         $TenantId,
@@ -37,6 +39,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [string[]]
             #Scopes to ask token for
         $RequiredScopes,
+
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [string]
             #Client secret for ClientID
@@ -49,7 +52,9 @@ This command returns AAD authentication factory for Public client auth flow with
             #Used to get access as application rather than as calling user
         $X509Certificate,
 
-        [Parameter()]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
+        [Parameter(ParameterSetName = 'PublicClient')]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
@@ -64,26 +69,43 @@ This command returns AAD authentication factory for Public client auth flow with
         [Parameter(ParameterSetName = 'PublicClient')]
         [string]
             #Username hint for authentication UI
-        $UserNameHint
+        $UserNameHint,
+
+        [Parameter(ParameterSetName = 'MSI')]
+        [Switch]
+            #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
+        $UseManagedIdentity
     )
 
     process
     {
         switch($PSCmdlet.ParameterSetName)
         {
-            'PublicClient' {
-                new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
-                break;
-            }
             'ConfidentialClientWithSecret' {
-                new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
                 break;
             }
             'ConfidentialClientWithCertificate' {
-                new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                break;
+            }
+            'PublicClient' {
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
+                break;
+            }
+            'MSI' {
+                if([string]::IsNullOrEmpty($ClientId))
+                {
+                    $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($RequiredScopes)
+                }
+                else
+                {
+                    $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
+                }
                 break;
             }
         }
+        $script:AadLastCreatedFactory
     }
 }
 
@@ -111,15 +133,21 @@ Command creates authentication factory and retrieves AAD token from it
 
     param
     (
-        [Parameter(Mandatory, ValueFromPipeline)]
+        [Parameter(ValueFromPipeline)]
         [GreyCorbel.Identity.Authentication.AadAuthenticationFactory]
             #AAD authentication factory created via New-AadAuthenticationFactory
-        $Factory
+        $Factory = $script:AadLastCreatedFactory
     )
 
     process
     {
-        $factory.AuthenticateAsync().GetAwaiter().GetResult()
+        try {
+            $task = $factory.AuthenticateAsync()
+            $task.GetAwaiter().GetResult()
+        }
+        catch [System.OperationCanceledException] {
+            Write-Verbose "Authentication process has been cancelled"
+        }
     }
 }
 function Test-AadToken

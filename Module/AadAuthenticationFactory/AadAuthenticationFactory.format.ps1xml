@@ -2,7 +2,7 @@
 <Configuration>
     <ViewDefinitions>
         <View>
-        <Name>JournalEntry</Name>
+        <Name>TokenValidationResult</Name>
         <ViewSelectedBy>
             <TypeName>GreyCorbel.Identity.Authentication.TokenValidationResult</TypeName>
         </ViewSelectedBy>
@@ -17,7 +17,10 @@
             <Label>Resource</Label>
             </TableColumnHeader>
             <TableColumnHeader>
-            <Label>AppId</Label>
+            <Label>Audience</Label>
+            </TableColumnHeader>
+            <TableColumnHeader>
+            <Label>Expires</Label>
             </TableColumnHeader>
             </TableHeaders>
             <TableRowEntries>
@@ -43,7 +46,14 @@
                     <TableColumnItem>
                         <ScriptBlock>
                         <![CDATA[
-                        $_.Payload.appId
+                        $_.Payload.aud
+                        ]]>
+                        </ScriptBlock>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <ScriptBlock>
+                        <![CDATA[
+                        if($null -ne $_.Payload.exp) {(new-object DateTime(1970,1,1,0,0,0,0,[DateTimeKind]::Utc)).AddSeconds($_.Payload.exp)}
                         ]]>
                         </ScriptBlock>
                     </TableColumnItem>

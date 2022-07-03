@@ -1,6 +1,8 @@
 ﻿using Microsoft.Identity.Client;
 using System;
 using System.Linq;
+using System.Net.Http;
+using System.Reflection;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -9,31 +11,7 @@ using System.Threading.Tasks;
 namespace GreyCorbel.Identity.Authentication
 {
     /// <summary>
-    /// Public client supported authentication flows
-    /// </summary>
-    public enum AuthenticationMode
-    {
-        /// <summary>
-        /// Interactive flow with webview or browser
-        /// </summary>
-        Interactive,
-        /// <summary>
-        /// DeviceCode flow with authentication performed with code on different device
-        /// </summary>
-        DeviceCode,
-    }
-
-    /// <summary>
-    /// Type of client we use for auth
-    /// </summary>
-    enum AuthenticationFlow
-    {
-        PublicClient,
-        ConfidentialClient
-    }
-
-    /// <summary>
-    /// Common wrapper class for various authentication flows
+    /// Main object responsible for authentication according to constructor and parameters used
     /// </summary>
     public class AadAuthenticationFactory
     {
@@ -74,6 +52,7 @@ namespace GreyCorbel.Identity.Authentication
 
         private readonly IPublicClientApplication _publicClientApplication;
         private readonly IConfidentialClientApplication _confidentialClientApplication;
+        private readonly ManagedIdentityClientApplication _managedIdentityClientApplication;
         /// <summary>
         /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
         /// </summary>
@@ -84,7 +63,6 @@ namespace GreyCorbel.Identity.Authentication
         /// <param name="authenticationMode">Type of public client flow to use</param>
         /// <param name="userNameHint">Which username to use in auth UI in case there may be multiple names available</param>
         public AadAuthenticationFactory(
-            
             string tenantId, 
             string clientId, 
             string [] scopes, 
@@ -101,14 +79,17 @@ namespace GreyCorbel.Identity.Authentication
 
             _flow = AuthenticationFlow.PublicClient;
 
-            _publicClientApplication = PublicClientApplicationBuilder.Create(_clientId)
+            var builder = PublicClientApplicationBuilder.Create(_clientId)
                 .WithDefaultRedirectUri()
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .Build();
+                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+            
+
+            _publicClientApplication = builder.Build();
         }
 
         /// <summary>
-        /// Creates factory that supporrts Confidential client flows with ClientSecret authentication
+        /// Creates factory that supporrts Confidential client flows via MSAL with ClientSecret authentication
         /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
         /// <param name="clientId">ClientId to use</param>
@@ -128,20 +109,23 @@ namespace GreyCorbel.Identity.Authentication
 
             _flow = AuthenticationFlow.ConfidentialClient;
 
-            _confidentialClientApplication = ConfidentialClientApplicationBuilder.Create(_clientId)
+
+            var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithClientSecret(clientSecret)
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .Build();
+                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+
+            _confidentialClientApplication = builder.Build();
         }
 
         /// <summary>
-        /// Creates factory that supporrts Confidential client flows with X509 certificate authentication
+        /// Constructor for Confidential client authentication flow via MSAL and X509 certificate authentication
         /// </summary>
-        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
-        /// <param name="clientId">ClientId to use</param>
-        /// <param name="scopes">List of scopes that clients asks for</param>
-        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
-        /// <param name="clientCertificate">Client secret to be used</param>
+        /// <param name="tenantId">Dns domain name or tenant guid</param>
+        /// <param name="clientId">Client id that represents application asking for token</param>
+        /// <param name="clientCertificate">X509 certificate with private key. Public part of certificate is expected to be registered with app registration for given client id in AAD.</param>
+        /// <param name="scopes">Scopes application asks for</param>
+        /// <param name="loginApi">AAD endpoint URL for special instance of AAD (/e.g. US Gov)</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
@@ -155,18 +139,44 @@ namespace GreyCorbel.Identity.Authentication
 
             _flow = AuthenticationFlow.ConfidentialClient;
 
-            _confidentialClientApplication = ConfidentialClientApplicationBuilder.Create(_clientId)
+            var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithCertificate(clientCertificate)
-                .WithAuthority($"{_loginApi}/{tenantId}")
-                .Build();
+                .WithAuthority($"{_loginApi}/{tenantId}");
+
+            _confidentialClientApplication = builder.Build();
         }
 
         /// <summary>
-        /// Authenticates caller based on configuration provided in constructor.
+        /// Creates factory that supports ManagedIdentity authentication
         /// </summary>
-        /// <returns>
-        /// AuthenticationResult that contains tokens and other information
-        /// </returns>
+        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array of scopes.</param>
+        public AadAuthenticationFactory(string[] scopes)
+        {
+            _scopes = scopes;
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory());
+            _flow = AuthenticationFlow.ManagedIdentity;
+
+        }
+
+        /// <summary>
+        /// Creates factory that supports UserAssignedIdentity authentication with provided client id
+        /// </summary>
+        /// <param name="clientId">AppId of User Assigned Identity</param>
+        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
+        public AadAuthenticationFactory(string clientId, string[] scopes)
+        {
+            _scopes = scopes;
+            _clientId = clientId;
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory(), clientId);
+            _flow = AuthenticationFlow.UserAssignedIdentity;
+        }
+
+        /// <summary>
+        /// Returns authentication result
+        /// Microsoft says we should not instantiate directly - but how to achieve unified experience of caller without being able to return it?
+        /// </summary>
+        /// <returns cref="AuthenticationResult">Authentication result object either returned fropm MSAL libraries, or - for ManagedIdentity - constructed from Managed Identity endpoint response, as returned by cref="ManagedIdentityClientApplication.ApiVersion" version of endpoint</returns>
+        /// <exception cref="ArgumentException">Throws if unsupported authentication mode or flow detected</exception>
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
             using CancellationTokenSource cts = new(TimeSpan.FromMinutes(2));
@@ -189,21 +199,31 @@ namespace GreyCorbel.Identity.Authentication
                     }
                     catch (MsalUiRequiredException)
                     {
-                        result = _authMode switch
+                        switch (_authMode)
                         {
-                            AuthenticationMode.Interactive => await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token),
-                            AuthenticationMode.DeviceCode => await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
-                            {
-                                Console.WriteLine(callback.Message);
-                                return Task.FromResult(0);
-                            }).ExecuteAsync(cts.Token),
-                            _ => throw new ArgumentException($"Unsupported Public client authentication mode: {_authMode}"),
-                        };
+                            case AuthenticationMode.Interactive:
+                                result = await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token);
+                                break;
+                            case AuthenticationMode.DeviceCode:
+                                result = await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
+                                {
+                                    Console.WriteLine(callback.Message);
+                                    return Task.FromResult(0);
+                                }).ExecuteAsync(cts.Token);
+                                break;
+                            default:
+                                throw new ArgumentException($"Unsupported authentication mode: {_authMode}");
+                        }
                     }
                     return result;
 
                 case AuthenticationFlow.ConfidentialClient:
                     return await _confidentialClientApplication.AcquireTokenForClient(_scopes).ExecuteAsync(cts.Token);
+                case AuthenticationFlow.ManagedIdentity:
+                    return await _managedIdentityClientApplication.AcquireTokenForClient(_scopes, cts.Token);
+                case AuthenticationFlow.UserAssignedIdentity:
+                    return await _managedIdentityClientApplication.AcquireTokenForClient(_scopes, cts.Token);
+
             }
 
             throw new ArgumentException($"Unsupported authentication flow: {_flow}");
