@@ -199,21 +199,16 @@ namespace GreyCorbel.Identity.Authentication
                     }
                     catch (MsalUiRequiredException)
                     {
-                        switch (_authMode)
+                        result = _authMode switch
                         {
-                            case AuthenticationMode.Interactive:
-                                result = await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token);
-                                break;
-                            case AuthenticationMode.DeviceCode:
-                                result = await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
-                                {
-                                    Console.WriteLine(callback.Message);
-                                    return Task.FromResult(0);
-                                }).ExecuteAsync(cts.Token);
-                                break;
-                            default:
-                                throw new ArgumentException($"Unsupported authentication mode: {_authMode}");
-                        }
+                            AuthenticationMode.Interactive => await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token),
+                            AuthenticationMode.DeviceCode => await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
+                            {
+                                Console.WriteLine(callback.Message);
+                                return Task.FromResult(0);
+                            }).ExecuteAsync(cts.Token),
+                            _ => throw new ArgumentException($"Unsupported Public client authentication mode: {_authMode}"),
+                        };
                     }
                     return result;
 
