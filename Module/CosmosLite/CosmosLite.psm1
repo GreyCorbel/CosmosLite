@@ -30,6 +30,14 @@ Description
 -----------
 This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Application auth flow
 
+.EXAMPLE
+
+Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -UseManagedIdentity
+
+Description
+-----------
+This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with authentication by Managed Identity
+
 #>
 
     param

@@ -35,12 +35,15 @@ All operations return unified response object that contains below fields:
 ## Authentication
 Module supports OAuth authentication with AAD in Delegated and Application contexts.
 
-No other authentication mechanisms are currently supported - I don't plan to implement them here and want to focus on RBAC only. Target audience is both ad-hoc interactive scripting (with Delegated authentication) and backend processes (authentication with ClientSecret or X.509 certificate)
+No other authentication mechanisms are currently supported - I don't plan to implement them here and want to focus on RBAC and OAuth only. Target audience is both ad-hoc interactive scripting (with Delegated authentication) and backend processes with explicit app identity (authentication with ClientSecret or X.509 certificate) or implicit identity (authenticated with Azure Managed Identity)
 
-Authentication uses simple library that implements Public and Confidential client flows.
+Authentication uses simple library that implements Public and Confidential client flows, and authentication with Azure Managed Identity.
 
 For Public client flow, authentication uses well-known ClientId for Azure Powershell by defsault, or you can use your app registered with your tenant, if you wish.
+
 For Confidential client flow, use own ClientId with Client Secret or Certificate.
+
+For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function - all cases with System Managed Identity and User Managed Identity.
 
 Library relies on Microsoft.Identity.Client assembly that is also packed with module. 
 
@@ -62,7 +65,8 @@ $appId = '1b69b00f-08f0-4798-9976-af325f7f7526'
 $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
 Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -TenantId dhl.com -ClientId $appId -X509Certificate $cert
 
-
+#connect Cosmos with Managed Identiy
+Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -UseManagedIdentity
 
 #get document by id and partition key from container test-coll
 #first request causes authentication
