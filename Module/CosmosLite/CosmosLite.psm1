@@ -98,8 +98,6 @@ This command returns configuration object for working with CosmosDB account myCo
 
     process
     {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
         if(-not [string]::IsNullOrWhitespace($proxy))
         {
             [system.net.webrequest]::defaultwebproxy = new-object system.net.webproxy($Proxy)

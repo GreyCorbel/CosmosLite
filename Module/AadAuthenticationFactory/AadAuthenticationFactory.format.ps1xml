@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Configuration>
+    <ViewDefinitions>
+        <View>
+        <Name>TokenValidationResult</Name>
+        <ViewSelectedBy>
+            <TypeName>GreyCorbel.Identity.Authentication.TokenValidationResult</TypeName>
+        </ViewSelectedBy>
+        <TableControl>
+            <TableHeaders>
+            <TableColumnHeader>
+            </TableColumnHeader>
+            <TableColumnHeader>
+            <Label>Header</Label>
+            </TableColumnHeader>
+            <TableColumnHeader>
+            <Label>Resource</Label>
+            </TableColumnHeader>
+            <TableColumnHeader>
+            <Label>Audience</Label>
+            </TableColumnHeader>
+            <TableColumnHeader>
+            <Label>Expires</Label>
+            </TableColumnHeader>
+            </TableHeaders>
+            <TableRowEntries>
+            <TableRowEntry>
+                <TableColumnItems>
+                    <TableColumnItem>
+                        <PropertyName>IsValid</PropertyName>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <ScriptBlock>
+                        <![CDATA[
+                        "$($_.Header.typ) $($_.Header.alg) $($_.Header.kid)"
+                        ]]>
+                        </ScriptBlock>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <ScriptBlock>
+                        <![CDATA[
+                        $_.Payload.aud
+                        ]]>
+                        </ScriptBlock>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <ScriptBlock>
+                        <![CDATA[
+                        $_.Payload.aud
+                        ]]>
+                        </ScriptBlock>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <ScriptBlock>
+                        <![CDATA[
+                        if($null -ne $_.Payload.exp) {(new-object DateTime(1970,1,1,0,0,0,0,[DateTimeKind]::Utc)).AddSeconds($_.Payload.exp)}
+                        ]]>
+                        </ScriptBlock>
+                    </TableColumnItem>
+                </TableColumnItems>
+            </TableRowEntry>
+            </TableRowEntries>
+        </TableControl>
+        </View>
+    </ViewDefinitions>
+</Configuration>
