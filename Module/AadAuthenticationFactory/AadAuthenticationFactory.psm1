@@ -69,8 +69,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [Parameter(ParameterSetName = 'MSI')]
         [Switch]
             #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
-        $UseMSI
-
+        $UseManagedIdentity
     )
 
     process
@@ -87,6 +86,17 @@ This command returns AAD authentication factory for Public client auth flow with
             }
             'ConfidentialClientWithCertificate' {
                 new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                break;
+            }
+            'MSI' {
+                if([string]::IsNullOrEmpty($ClientId))
+                {
+                    new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($RequiredScopes)
+                }
+                else
+                {
+                    new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
+                }
                 break;
             }
         }
