@@ -13,6 +13,7 @@ namespace GreyCorbel.Identity.Authentication
     {
         VM,
         AppService,
+        Arc,
         Unknown
     }
 
@@ -24,7 +25,7 @@ namespace GreyCorbel.Identity.Authentication
     {
         static string IdentityEndpoint => Environment.GetEnvironmentVariable("IDENTITY_ENDPOINT");
         static string IdentityHeader => Environment.GetEnvironmentVariable("IDENTITY_HEADER");
-        public static string ApiVersion => "2019-08-01";
+        public static string ApiVersion => "2020-06-01";
         static string SecretHeaderName => "X-IDENTITY-HEADER";
         static string ClientIdHeaderName => "client_id";
 

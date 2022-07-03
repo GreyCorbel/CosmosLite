@@ -819,7 +819,12 @@ function FormatCosmosResponseInternal
         if($null -ne $rsp.Content)
         {
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            $retVal.Data = ($s | ConvertFrom-Json -ErrorAction Stop)
+            try {
+                $retVal.Data = ($s | ConvertFrom-Json -ErrorAction Stop)
+            }
+            catch {
+                throw new-object System.FormatException("InvalidPayloadReceived: $s")
+            }
         }
         return $retVal
     }

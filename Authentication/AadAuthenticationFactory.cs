@@ -147,7 +147,7 @@ namespace GreyCorbel.Identity.Authentication
         /// Microsoft says we should not instantiate directly - but how to achieve unified experience of caller without being able to return it?
         /// </summary>
         /// <returns cref="AuthenticationResult">Authentication result object either returned fropm MSAL libraries, or - for ManagedIdentity - constructed from Managed Identity endpoint response, as returned by cref="ManagedIdentityClientApplication.ApiVersion" version of endpoint</returns>
-        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ArgumentException">Throws if unsupported authentication mode or flow detected</exception>
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
             using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
@@ -198,7 +198,6 @@ namespace GreyCorbel.Identity.Authentication
             }
 
             throw new ArgumentException($"Unsupported authentication flow: {_flow}");
-
         }
     }
 }
