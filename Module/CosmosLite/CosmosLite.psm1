@@ -84,6 +84,12 @@ This command returns configuration object for working with CosmosDB account myCo
             #How to authenticate user - via web view or via device code flow
         $UserNameHint,
 
+        [Parameter(ParameterSetName = 'MSI')]
+        [Switch]
+            #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
+        $UseManagedIdentity,
+
+
         [Parameter()]
         [string]
             #Name of the proxy if connection to Azure has to go via proxy server
@@ -92,21 +98,6 @@ This command returns configuration object for working with CosmosDB account myCo
 
     process
     {
-        switch($PSEdition)
-        {
-            'Core'
-            {
-                Add-type -Path "$PSScriptRoot\Shared\netcoreapp2.1\Microsoft.Identity.Client.dll"
-                break;
-            }
-            'Desktop'
-            {
-                Add-Type -Path "$PSScriptRoot\Shared\net461\Microsoft.Identity.Client.dll"
-                break;
-            }
-        }
-        Add-Type -Path "$PSScriptRoot\Shared\netstandard2.1\GreyCorbel.Identity.Authentication.dll"
-
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
         if(-not [string]::IsNullOrWhitespace($proxy))
@@ -129,15 +120,19 @@ This command returns configuration object for working with CosmosDB account myCo
         switch($PSCmdlet.ParameterSetName)
         {
             'PublicClient' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
+                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RequiredScopes $RequiredScopes -LoginApi $LoginApi -AuthMode $AuthMode -UserNameHint $UserNameHint
                 break;
             }
             'ConfidentialClientWithSecret' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
+                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi
                 break;
             }
             'ConfidentialClientWithCertificate' {
-                $script:AuthFactories[$AccountName] = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                break;
+            }
+            'MSI' {
+                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes
                 break;
             }
         }
