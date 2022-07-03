@@ -811,7 +811,7 @@ function FormatCosmosResponseInternal
         if($null -ne $rsp.Content)
         {
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            $retVal.Data = ($s | ConvertFrom-Json)
+            $retVal.Data = ($s | ConvertFrom-Json -ErrorAction Stop)
         }
         return $retVal
     }
@@ -842,6 +842,9 @@ function ProcessRequestWithRetryInternal
                 }
                 else {return (FormatCosmosResponseInternal -rsp $rsp)}
     
+            }
+            catch {
+                throw $_.Exception
             }
             finally {
                 if($null -ne $rsp) {$rsp.Dispose()}
