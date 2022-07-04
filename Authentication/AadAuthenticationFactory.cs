@@ -215,9 +215,9 @@ namespace GreyCorbel.Identity.Authentication
                 case AuthenticationFlow.ConfidentialClient:
                     return await _confidentialClientApplication.AcquireTokenForClient(_scopes).ExecuteAsync(cts.Token);
                 case AuthenticationFlow.ManagedIdentity:
-                    return await _managedIdentityClientApplication.AcquireTokenForClient(_scopes, cts.Token);
+                    return await _managedIdentityClientApplication.AcquireTokenForClientAsync(_scopes, cts.Token);
                 case AuthenticationFlow.UserAssignedIdentity:
-                    return await _managedIdentityClientApplication.AcquireTokenForClient(_scopes, cts.Token);
+                    return await _managedIdentityClientApplication.AcquireTokenForClientAsync(_scopes, cts.Token);
 
             }
 

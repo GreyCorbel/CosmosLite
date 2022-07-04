@@ -9,138 +9,50 @@ using System.Threading.Tasks;
 
 namespace GreyCorbel.Identity.Authentication
 {
-    enum ManagedIdentityClientApplicationSpecialization
-    {
-        VM,
-        AppService,
-        Arc,
-        Unknown
-    }
-
 #pragma warning disable CA1001 // Types that own disposable fields should be disposable
     // SemaphoreSlim only needs to be disposed when AvailableWaitHandle is called.
-    class ManagedIdentityClientApplication
+    class ManagedIdentityClientApplication:TokenProvider
 #pragma warning restore CA1001
 
     {
-        static string IdentityEndpoint => Environment.GetEnvironmentVariable("IDENTITY_ENDPOINT");
-        static string IdentityHeader => Environment.GetEnvironmentVariable("IDENTITY_HEADER");
-        public static string ApiVersion => "2020-06-01";
-        static string SecretHeaderName => "X-IDENTITY-HEADER";
-        static string ClientIdHeaderName => "client_id";
-
-        readonly string _clientId = null;
-
-        IMsalHttpClientFactory _httpClientFactory;
-
+        ITokenProvider _tokenProvider = null;
         AuthenticationResult _cachedToken = null;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
-        private readonly ManagedIdentityClientApplicationSpecialization _specialization = ManagedIdentityClientApplicationSpecialization.Unknown;
         private readonly int _ticketOverlapSeconds = 300;
 
         public ManagedIdentityClientApplication(IMsalHttpClientFactory factory, string clientId = null)
+        :base(factory, clientId)
         {
-            _httpClientFactory = factory;
-            _clientId = clientId;
             if (!string.IsNullOrEmpty(IdentityEndpoint) && !string.IsNullOrEmpty(IdentityHeader))
-                _specialization = ManagedIdentityClientApplicationSpecialization.AppService;
+                _tokenProvider = new AppServiceTokenProvider(factory, clientId);
+            //else if (!string.IsNullOrEmpty(IdentityEndpoint) && !string.IsNullOrEmpty(ImdsEndpoint))
+            //    _specialization = ManagedIdentityClientApplicationSpecialization.Arc;
             else
-                _specialization = ManagedIdentityClientApplicationSpecialization.VM;
+                _tokenProvider = new VMIdentityTokenProvider(factory, clientId);
         }
 
-        public async Task<AuthenticationResult> AcquireTokenForClient(string[] scopes, CancellationToken cancellationToken)
+        public override async Task<AuthenticationResult> AcquireTokenForClientAsync(string[] scopes, CancellationToken cancellationToken)
         {
             await _lock.WaitAsync().ConfigureAwait(false);
 
             try
             {
-                if (null != _cachedToken && _cachedToken.ExpiresOn.UtcDateTime > DateTime.UtcNow.AddSeconds(_ticketOverlapSeconds))
-                    return _cachedToken;
-
-                //token not retrieved yet or about to expire --> get a new one
-                var client = _httpClientFactory.GetHttpClient();
-                using HttpRequestMessage message = CreateRequestMessage(scopes);
-
-                using var response = await client.SendAsync(message, cancellationToken).ConfigureAwait(false);
-                if (response.IsSuccessStatusCode)
+                if (null == _cachedToken && _cachedToken.ExpiresOn.UtcDateTime < DateTime.UtcNow.AddSeconds(-_ticketOverlapSeconds))
                 {
-                    string payload = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    var authResponse = payload.FromJson<ManagedIdentityAuthenticationResponse>();
-                    if (authResponse != null)
+                    if (null != _tokenProvider)
                     {
-                        _cachedToken = CreateAuthenticationResult(authResponse);
-                        return _cachedToken;
+                        _cachedToken = await _tokenProvider.AcquireTokenForClientAsync(scopes, cancellationToken).ConfigureAwait(false);
                     }
                     else
-                        throw new FormatException($"Invalid authentication response received: {payload}");
+                        throw new InvalidOperationException("Token provider not initialized");
                 }
-                else
-                    throw new MsalClientException(response.StatusCode.ToString(), response.ReasonPhrase);
+                return _cachedToken;
             }
             finally
             {
                 _lock.Release();
             }
-        }
-        HttpRequestMessage CreateRequestMessage(string[] scopes)
-        {
-            using HttpRequestMessage message = new HttpRequestMessage();
-            message.Method = HttpMethod.Get;
-            StringBuilder sb;
-
-            switch (_specialization)
-            {
-                case ManagedIdentityClientApplicationSpecialization.AppService:
-
-                    sb = new StringBuilder(IdentityEndpoint);
-                    message.Headers.Add(SecretHeaderName, IdentityHeader);
-                    break;
-
-                case ManagedIdentityClientApplicationSpecialization.VM:
-                    sb = new StringBuilder("http://169.254.169.254/metadata/identity/oauth2/token");
-                    break;
-                default:
-                    throw new InvalidOperationException("ManagedIdentityClientApplication: We're running in unsupported or unrecognized environment");
-            }
-
-            //the same for all types so far
-            sb.Append($"?api-version={Uri.EscapeDataString(ApiVersion)}");
-            sb.Append($"&resource={Uri.EscapeDataString(ScopeHelper.ScopeToResource(scopes))}");
-
-            if (!string.IsNullOrEmpty(_clientId))
-            {
-                sb.Append($"client_id={Uri.EscapeDataString(_clientId)}");
-                sb.Append("&");
-            }
-            message.RequestUri = new Uri(sb.ToString());
-            message.Headers.Add("Metadata", "true");
-            return message;
-        }
-        /// <summary>
-        /// Creates unified authentication response
-        /// </summary>
-        /// <param name="authResponse">Object representing response from internal identity endpoint</param>
-        /// <returns></returns>
-        AuthenticationResult CreateAuthenticationResult(ManagedIdentityAuthenticationResponse authResponse)
-        {
-            long tokenExpiresOn = long.Parse(authResponse.expires_on);
-            DateTimeOffset tokenExpires = new DateTimeOffset(DateTime.UtcNow.AddSeconds(tokenExpiresOn));
-            Guid tokenId = Guid.NewGuid();
-            return new AuthenticationResult(
-                authResponse.access_token,
-                false,
-                tokenId.ToString(),
-                tokenExpires,
-                tokenExpires,
-                null,
-                null,
-                null,
-                ScopeHelper.ResourceToScope(authResponse.resource),
-                tokenId,
-                authResponse.token_type
-                );
-
         }
     }
 }

@@ -1,14 +1,4 @@
-﻿using Microsoft.Identity.Client;
-using System;
-using System.Linq;
-using System.Net.Http;
-using System.Reflection;
-using System.Security;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace GreyCorbel.Identity.Authentication
+﻿namespace GreyCorbel.Identity.Authentication
 {
     /// <summary>
     /// Public client supported authentication flows
