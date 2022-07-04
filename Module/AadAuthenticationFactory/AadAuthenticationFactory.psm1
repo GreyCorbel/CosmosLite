@@ -33,7 +33,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [string]
             #ClientId of application that gets token to CosmosDB.
             #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
-        $ClientId = '1950a258-227b-4e31-a9cf-717495945fc2',
+        $ClientId = $script:DefaultClientId,
 
         [Parameter(Mandatory)]
         [string[]]
@@ -94,7 +94,7 @@ This command returns AAD authentication factory for Public client auth flow with
                 break;
             }
             'MSI' {
-                if([string]::IsNullOrEmpty($ClientId))
+                if([string]::IsNullOrEmpty($ClientId) -or $ClientId -eq $script:DefaultClientId)
                 {
                     $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($RequiredScopes)
                 }
@@ -288,6 +288,7 @@ function Init
         Add-Type -Path "$PSScriptRoot\Shared\netstandard2.0\GreyCorbel.Identity.Authentication.dll"
 
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $script:DefaultClientId = '1950a258-227b-4e31-a9cf-717495945fc2'
     }
 }
 #endregion

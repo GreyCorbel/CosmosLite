@@ -38,7 +38,7 @@ namespace GreyCorbel.Identity.Authentication
 
             try
             {
-                if (null == _cachedToken && _cachedToken.ExpiresOn.UtcDateTime < DateTime.UtcNow.AddSeconds(-_ticketOverlapSeconds))
+                if (null == _cachedToken || _cachedToken.ExpiresOn.UtcDateTime < DateTime.UtcNow.AddSeconds(-_ticketOverlapSeconds))
                 {
                     if (null != _tokenProvider)
                     {
