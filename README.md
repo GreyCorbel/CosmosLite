@@ -58,15 +58,18 @@ Few sample below, also see help that comes with commands of the module.
 #connect to cosmos db account test-acct and db test with well-known clientId for Azure PowerShell (1950a258-227b-4e31-a9cf-717495945fc2)
 $ctx = Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydomain.com' -AuthMode Interactive
 
-#connect to cosmos db account test-acct-2 and db test with appID and certificate
-#returned context is automatically stored and used for last called Connect-Cosmos 
-$thumbprint = 'e827f78a78cf532eb539479d6afe9c7f703173d5'
-$appId = '1b69b00f-08f0-4798-9976-af325f7f7526'
+#connect to cosmos db account myCosmosDbAccount and db myDbInCosmosAccount with appID and certificate
+#returned context is automatically stored and used for subsequent call of other commands
+$thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
+$appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
 $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -TenantId dhl.com -ClientId $appId -X509Certificate $cert
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
 
-#connect Cosmos with Managed Identiy
-Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -UseManagedIdentity
+#connect Cosmos with System assigned Managed Identiy
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -UseManagedIdentity
+
+#connect Cosmos with User assigned Managed Identiy
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
 
 #get document by id and partition key from container test-coll
 #first request causes authentication

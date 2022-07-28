@@ -21,23 +21,30 @@ Description
 This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Delegated auth flow
 
 .EXAMPLE
-$thumbprint = 'e827f78a78cf532eb539479d6afe9c7f703173d5'
-$appId = '1b69b00f-08f0-4798-9976-af325f7f7526'
+$thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
+$appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
 $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -TenantId dhl.com -ClientId $appId -X509Certificate $cert
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
 
 Description
 -----------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Application auth flow
+This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mycompany.com, with Application auth flow
 
 .EXAMPLE
 
-Connect-Cosmos -AccountName dhl-o365-onboarding-uat -Database onboarding -UseManagedIdentity
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -UseManagedIdentity
 
 Description
 -----------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with authentication by Managed Identity
+This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount, with authentication by System-assigned Managed Identity
 
+.EXAMPLE
+
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+
+Description
+-----------
+This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount, with authentication by User-assigned Managed Identity
 #>
 
     param
@@ -52,9 +59,12 @@ This command returns configuration object for working with CosmosDB account myCo
             #Name of database in CosmosDB account
         $Database,
 
-        [Parameter(Mandatory)]
+        [Parameter(ParameterSetName = 'PublicClient')]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
         [string]
             #Id of tenant where to autenticate the user. Can be tenant id, or any registerd DNS domain
+            #Not necessary when connecting with Managed Identity, otherwise ncesessary
         $TenantId,
 
         [Parameter()]

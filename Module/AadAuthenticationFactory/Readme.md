@@ -54,8 +54,8 @@ Test-AadToken -Token $graphToken.AccessToken
 Test-AadToken -Token $vaultToken.AccessToken
 ```
 
-## Managed identity
-This sample assumes that code runs in environment supporting Azure Managed identity abd uses it to get tokens.
+## System assigned Managed identity
+This sample assumes that code runs in environment supporting Azure Managed identity and uses it to get tokens.
 ```powershell
 $azConfigFactory = New-AadAuthenticationfactory -RequiredScopes 'https://azconfig.io/.default' -UseManagedIdentity
 #create factory for issuing of tokens for Azure KeyVault
@@ -64,4 +64,10 @@ $vaultFactory = New-AadAuthenticationfactory -UseManagedIdentity -RequiredScopes
 #get tokens
 $graphToken = Get-AadToken -Factory $graphFactory
 $vaultToken = $vaultFactory | Get-AadToken
-
+```
+## User assigned Managed identity
+This sample assumes that code runs in environment supporting Azure Managed identity and uses it to get tokens.
+```powershell
+$azConfigFactory = New-AadAuthenticationfactory -RequiredScopes 'https://azconfig.io/.default' -UseManagedIdentity -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf'
+Get-AadToken | Select-object -expandProperty AccessToken | Test-AadToken | select-object -expandProperty payload
+```
