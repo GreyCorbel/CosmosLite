@@ -1,5 +1,7 @@
 ﻿using Microsoft.Identity.Client;
 using System;
+using System.Security.Claims;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,29 +25,37 @@ namespace GreyCorbel.Identity.Authentication
         {
             _httpClientFactory = factory;
             _clientId = clientId;
-
         }
         public abstract Task<AuthenticationResult> AcquireTokenForClientAsync(string[] scopes, CancellationToken cancellationToken);
 
         protected AuthenticationResult CreateAuthenticationResult(ManagedIdentityAuthenticationResponse authResponse)
         {
-            long tokenExpiresOn = long.Parse(authResponse.expires_on);
-            DateTimeOffset tokenExpires = new DateTimeOffset(DateTime.UtcNow.AddSeconds(tokenExpiresOn));
+            long.TryParse(authResponse.expires_on,  out long expiresOn);
+            DateTimeOffset tokenExpiresOn = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(expiresOn);
+            ClaimsPrincipal principal = null;
+            if(!string.IsNullOrEmpty(authResponse.client_id))
+            {
+                principal = new();
+                GenericIdentity identity = new(authResponse.client_id, "aad");
+                principal.AddIdentity(new ClaimsIdentity(identity));
+            }
+
             Guid tokenId = Guid.NewGuid();
             return new AuthenticationResult(
                 authResponse.access_token,
                 false,
                 tokenId.ToString(),
-                tokenExpires,
-                tokenExpires,
+                tokenExpiresOn,
+                tokenExpiresOn,
                 null,
                 null,
                 null,
                 ScopeHelper.ResourceToScope(authResponse.resource),
                 tokenId,
-                authResponse.token_type
+                authResponse.token_type,
+                null,
+                principal
                 );
-
         }
     }
 }
