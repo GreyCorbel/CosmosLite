@@ -47,6 +47,5 @@ namespace GreyCorbel.Identity.Authentication
                 );
 
         }
-
     }
 }
