@@ -25,6 +25,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithCertificate')]
         [Parameter(Mandatory,ParameterSetName = 'PublicClient')]
+        [Parameter(Mandatory,ParameterSetName = 'ResourceOwnerPasssword')]
         [string]
             #Id of tenant where to autenticate the user. Can be tenant id, or any registerd DNS domain
         $TenantId,
@@ -46,6 +47,12 @@ This command returns AAD authentication factory for Public client auth flow with
             #Used to get access as application rather than as calling user
         $ClientSecret,
 
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [pscredential]
+            #Resource Owner username and password
+            #Used to get access as user
+        $ResourceOwnerCredential,
+
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
         [System.Security.Cryptography.X509Certificates.X509Certificate2]
             #Authentication certificate for ClientID
@@ -55,6 +62,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
         [Parameter(ParameterSetName = 'PublicClient')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
@@ -102,6 +110,10 @@ This command returns AAD authentication factory for Public client auth flow with
                 {
                     $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
                 }
+                break;
+            }
+            'ResourceOwnerPasssword' {
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $ResourceOwnerCredential.UserName, $ResourceOwnerCredential.Password, $LoginApi)
                 break;
             }
         }

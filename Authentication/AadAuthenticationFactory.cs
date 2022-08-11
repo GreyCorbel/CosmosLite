@@ -1,6 +1,7 @@
 ﻿using Microsoft.Identity.Client;
 using System;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Security;
@@ -50,9 +51,15 @@ namespace GreyCorbel.Identity.Authentication
         public string UserName { get { return _userNameHint; } }
         private readonly string _userNameHint;
 
+        /// <summary>
+        /// Password for ROPC flow
+        /// </summary>
+        private readonly SecureString _resourceOwnerPassword;
+
         private readonly IPublicClientApplication _publicClientApplication;
         private readonly IConfidentialClientApplication _confidentialClientApplication;
         private readonly ManagedIdentityClientApplication _managedIdentityClientApplication;
+
         /// <summary>
         /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
         /// </summary>
@@ -108,7 +115,6 @@ namespace GreyCorbel.Identity.Authentication
             _scopes = scopes;
 
             _flow = AuthenticationFlow.ConfidentialClient;
-
 
             var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithClientSecret(clientSecret)
@@ -172,6 +178,42 @@ namespace GreyCorbel.Identity.Authentication
         }
 
         /// <summary>
+        /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
+        /// </summary>
+        /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+        /// <param name="clientId">ClientId to use</param>
+        /// <param name="scopes">List of scopes that clients asks for</param>
+        /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+        /// <param name="userName">Resource owner username and password</param>
+        /// <param name="password">Resource owner password</param>
+        public AadAuthenticationFactory(
+            string tenantId,
+            string clientId,
+            string[] scopes,
+            string userName,
+            SecureString password,
+            string loginApi = "https://login.microsoftonline.com"
+            )
+        {
+            _clientId = clientId;
+            _loginApi = loginApi;
+            _scopes = scopes;
+            _userNameHint = userName;
+            _resourceOwnerPassword = password;
+            _tenantId = tenantId;
+
+            _flow = AuthenticationFlow.ResourceOwnerPassword;
+
+            var builder = PublicClientApplicationBuilder.Create(_clientId)
+                .WithDefaultRedirectUri()
+                .WithAuthority($"{_loginApi}/{tenantId}")
+                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+
+
+            _publicClientApplication = builder.Build();
+        }
+
+        /// <summary>
         /// Returns authentication result
         /// Microsoft says we should not instantiate directly - but how to achieve unified experience of caller without being able to return it?
         /// </summary>
@@ -185,6 +227,7 @@ namespace GreyCorbel.Identity.Authentication
             {
                 //public client flow
                 case AuthenticationFlow.PublicClient:
+                {
                     var accounts = await _publicClientApplication.GetAccountsAsync();
                     IAccount account;
                     if (string.IsNullOrWhiteSpace(_userNameHint))
@@ -195,7 +238,7 @@ namespace GreyCorbel.Identity.Authentication
                     try
                     {
                         result = await _publicClientApplication.AcquireTokenSilent(_scopes, account)
-                                          .ExecuteAsync(cts.Token);
+                                            .ExecuteAsync(cts.Token);
                     }
                     catch (MsalUiRequiredException)
                     {
@@ -211,13 +254,37 @@ namespace GreyCorbel.Identity.Authentication
                         };
                     }
                     return result;
-
+                }
+                //Confidential client flow
                 case AuthenticationFlow.ConfidentialClient:
                     return await _confidentialClientApplication.AcquireTokenForClient(_scopes).ExecuteAsync(cts.Token);
+                //System Managed identity
                 case AuthenticationFlow.ManagedIdentity:
                     return await _managedIdentityClientApplication.AcquireTokenForClientAsync(_scopes, cts.Token);
+                //User managed identity
                 case AuthenticationFlow.UserAssignedIdentity:
                     return await _managedIdentityClientApplication.AcquireTokenForClientAsync(_scopes, cts.Token);
+                //ROPC flow
+                case AuthenticationFlow.ResourceOwnerPassword:
+                {
+                    var accounts = await _publicClientApplication.GetAccountsAsync();
+                    IAccount account;
+                    if (string.IsNullOrWhiteSpace(_userNameHint))
+                        account = accounts.FirstOrDefault();
+                    else
+                        account = accounts.Where(x => string.Compare(x.Username, _userNameHint, true) == 0).FirstOrDefault();
+
+                    try
+                    {
+                        result = await _publicClientApplication.AcquireTokenSilent(_scopes, account)
+                                            .ExecuteAsync(cts.Token);
+                    }
+                    catch (MsalUiRequiredException)
+                    {
+                        result = await _publicClientApplication.AcquireTokenByUsernamePassword(_scopes, _userNameHint, _resourceOwnerPassword).ExecuteAsync(cts.Token);
+                    }
+                    return result;
+                }
 
             }
 

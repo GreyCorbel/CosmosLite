@@ -23,6 +23,7 @@
         PublicClient,
         ConfidentialClient,
         ManagedIdentity,
-        UserAssignedIdentity
+        UserAssignedIdentity,
+        ResourceOwnerPassword
     }
 }
