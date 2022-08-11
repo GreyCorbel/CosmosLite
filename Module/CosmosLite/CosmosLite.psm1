@@ -456,7 +456,7 @@ This command replaces field 'content' in root of the document with ID '123' and 
         $rq.Uri = new-object System.Uri($uri)
         $rq.Payload = @{
             operations = $Updates
-        } | ConvertTo-Json
+        } | ConvertTo-Json -Depth 99
         $rq.ContentType = 'application/json_patch+json'
         ProcessRequestWithRetryInternal -rq $rq
     }
