@@ -12,7 +12,7 @@ Module comes with commands:
 |Get-AAdToken|Tells the factory to create a token. Factory returns cached token, if available, and takes care of token renewals silently whenever possible, after tokens expire|
 |Test-AadToken|Parses Access token or Id token and validates it against published keys. Provides PowerShell way of showing token content as available in http://jwt.ms|
 
-Module is meant to provide instant authentication services to other modules relying on AAD authentication  just make dependency on AadAuthenticationFactory module inother module and use it to get tokens for resources as you need. This is demonstrated by CosmosLite module in this repo.
+Module is meant to provide instant authentication services to other modules relying on AAD authentication  just make dependency on AadAuthenticationFactory module in other module and use it to get tokens for resources as you need. This is demonstrated by CosmosLite module in this repo.
 
 # Examples
 
@@ -71,3 +71,14 @@ This sample assumes that code runs in environment supporting Azure Managed ident
 $azConfigFactory = New-AadAuthenticationfactory -RequiredScopes 'https://azconfig.io/.default' -UseManagedIdentity -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf'
 Get-AadToken | Select-object -expandProperty AccessToken | Test-AadToken | select-object -expandProperty payload
 ```
+
+## Resource Owner Password Credential flow
+This sample uses ROPC to get token to access Graph API
+
+```powershell
+$creds = Get-Credential
+$graphFactory = New-AadAuthenticationFactory -TenantId 'mytenant.com' -ClientId $graphApiClientId -ResourceOwnerCredential $creds -RequiredScopes 'https://graph.microsoft.com/.default'
+$graphToken = Get-AadToken -Factory $graphFactory
+
+```
+
