@@ -32,8 +32,8 @@ This command returns AAD authentication factory for Public client auth flow with
 
         [Parameter()]
         [string]
-            #ClientId of application that gets token to CosmosDB.
-            #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
+            #ClientId of application that gets token
+            #Default: well-known clientId for Azure PowerShell
         $ClientId = $script:DefaultClientId,
 
         [Parameter(Mandatory)]
@@ -51,6 +51,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [pscredential]
             #Resource Owner username and password
             #Used to get access as user
+            #Note: Does not work for federated authentication
         $ResourceOwnerCredential,
 
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
@@ -72,11 +73,13 @@ This command returns AAD authentication factory for Public client auth flow with
         [ValidateSet('Interactive', 'DeviceCode')]
         [string]
             #How to authenticate client - via web view or via device code flow
+            #Used in public client flows
         $AuthMode,
         
         [Parameter(ParameterSetName = 'PublicClient')]
         [string]
             #Username hint for authentication UI
+            #Optional
         $UserNameHint,
 
         [Parameter(ParameterSetName = 'MSI')]
