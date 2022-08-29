@@ -833,7 +833,7 @@ function FormatCosmosResponseInternal
                 $retVal.Data = ($s | ConvertFrom-Json -ErrorAction Stop)
             }
             catch {
-                throw new-object System.FormatException("InvalidPayloadReceived: $s")
+                throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
         return $retVal
