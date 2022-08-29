@@ -59,12 +59,13 @@ namespace GreyCorbel.Identity.Authentication
         private readonly IPublicClientApplication _publicClientApplication;
         private readonly IConfidentialClientApplication _confidentialClientApplication;
         private readonly ManagedIdentityClientApplication _managedIdentityClientApplication;
+        private readonly string _defaultClientId = "1950a258-227b-4e31-a9cf-717495945fc2";
 
         /// <summary>
         /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
         /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
-        /// <param name="clientId">ClientId to use</param>
+        /// <param name="clientId">ClientId to use. If not specified, clientId of Azure Powershell is used</param>
         /// <param name="scopes">List of scopes that clients asks for</param>
         /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
         /// <param name="authenticationMode">Type of public client flow to use</param>
@@ -77,7 +78,11 @@ namespace GreyCorbel.Identity.Authentication
             AuthenticationMode authenticationMode = AuthenticationMode.Interactive, 
             string userNameHint = null)
         {
-            _clientId = clientId;
+            if (string.IsNullOrWhiteSpace(clientId))
+                _clientId = _defaultClientId;
+            else
+                _clientId = clientId;
+
             _loginApi = loginApi;
             _scopes = scopes;
             _authMode = authenticationMode;
@@ -153,18 +158,6 @@ namespace GreyCorbel.Identity.Authentication
         }
 
         /// <summary>
-        /// Creates factory that supports ManagedIdentity authentication
-        /// </summary>
-        /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array of scopes.</param>
-        public AadAuthenticationFactory(string[] scopes)
-        {
-            _scopes = scopes;
-            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory());
-            _flow = AuthenticationFlow.ManagedIdentity;
-
-        }
-
-        /// <summary>
         /// Creates factory that supports UserAssignedIdentity authentication with provided client id
         /// </summary>
         /// <param name="clientId">AppId of User Assigned Identity</param>
@@ -172,13 +165,20 @@ namespace GreyCorbel.Identity.Authentication
         public AadAuthenticationFactory(string clientId, string[] scopes)
         {
             _scopes = scopes;
-            _clientId = clientId;
-            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory(), clientId);
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                _clientId = clientId;
+            }
+            else
+            { 
+                _clientId=null;
+            }
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory(), _clientId);
             _flow = AuthenticationFlow.UserAssignedIdentity;
         }
 
         /// <summary>
-        /// Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
+        /// Creates factory that supporrts Public client ROPC flow
         /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
         /// <param name="clientId">ClientId to use</param>
@@ -195,7 +195,11 @@ namespace GreyCorbel.Identity.Authentication
             string loginApi = "https://login.microsoftonline.com"
             )
         {
-            _clientId = clientId;
+            if (string.IsNullOrWhiteSpace(clientId))
+                _clientId = _defaultClientId;
+            else
+                _clientId = clientId;
+
             _loginApi = loginApi;
             _scopes = scopes;
             _userNameHint = userName;

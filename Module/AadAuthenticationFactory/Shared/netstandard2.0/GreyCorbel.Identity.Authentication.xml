@@ -49,7 +49,7 @@
             Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
             </summary>
             <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
-            <param name="clientId">ClientId to use</param>
+            <param name="clientId">ClientId to use. If not specified, clientId of Azure Powershell is used</param>
             <param name="scopes">List of scopes that clients asks for</param>
             <param name="loginApi">AAD endpoint that will handle the authentication.</param>
             <param name="authenticationMode">Type of public client flow to use</param>
@@ -75,12 +75,6 @@
             <param name="scopes">Scopes application asks for</param>
             <param name="loginApi">AAD endpoint URL for special instance of AAD (/e.g. US Gov)</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String[])">
-            <summary>
-            Creates factory that supports ManagedIdentity authentication
-            </summary>
-            <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array of scopes.</param>
-        </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String[])">
             <summary>
             Creates factory that supports UserAssignedIdentity authentication with provided client id
@@ -90,7 +84,7 @@
         </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,System.Security.SecureString,System.String)">
             <summary>
-            Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
+            Creates factory that supporrts Public client ROPC flow
             </summary>
             <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
             <param name="clientId">ClientId to use</param>

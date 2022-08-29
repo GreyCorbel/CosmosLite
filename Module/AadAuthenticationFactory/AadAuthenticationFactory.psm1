@@ -34,7 +34,7 @@ This command returns AAD authentication factory for Public client auth flow with
         [string]
             #ClientId of application that gets token
             #Default: well-known clientId for Azure PowerShell
-        $ClientId = $script:DefaultClientId,
+        $ClientId,
 
         [Parameter(Mandatory)]
         [string[]]
@@ -105,14 +105,7 @@ This command returns AAD authentication factory for Public client auth flow with
                 break;
             }
             'MSI' {
-                if([string]::IsNullOrEmpty($ClientId) -or $ClientId -eq $script:DefaultClientId)
-                {
-                    $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($RequiredScopes)
-                }
-                else
-                {
-                    $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
-                }
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
                 break;
             }
             'ResourceOwnerPasssword' {
@@ -157,6 +150,7 @@ Command creates authentication factory and retrieves AAD token from it
     process
     {
         try {
+            #I don't know how to support Ctrl+Break
             $task = $factory.AuthenticateAsync()
             $task.GetAwaiter().GetResult()
         }
@@ -211,6 +205,7 @@ Command creates authentication factory, asks it to issue token for EventGrid and
             IsValid = $false
         }
 
+        #validate the result using published keys
         $endpoint = $result.Payload.iss.Replace('/v2.0','/')
 
         $signingKeys = Invoke-RestMethod -Method Get -Uri "$($endpoint)discovery/keys"
@@ -303,7 +298,6 @@ function Init
         Add-Type -Path "$PSScriptRoot\Shared\netstandard2.0\GreyCorbel.Identity.Authentication.dll"
 
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $script:DefaultClientId = '1950a258-227b-4e31-a9cf-717495945fc2'
     }
 }
 #endregion
