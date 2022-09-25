@@ -73,23 +73,32 @@ namespace GreyCorbel.Identity.Authentication
             _clientId = clientId;
             _loginApi = loginApi;
             _scopes = scopes;
-            _authMode = authenticationMode;
             _userNameHint = userNameHint;
             _tenantId = tenantId;
 
-            _flow = AuthenticationFlow.PublicClient;
+            switch(authenticationMode)
+            {
+                case AuthenticationMode.WIA:
+                    _flow = AuthenticationFlow.PublicClientWithWia;
+                    break;
+                case AuthenticationMode.DeviceCode:
+                    _flow = AuthenticationFlow.PublicClientWithDeviceCode;
+                    break;
+                default:
+                    _flow = AuthenticationFlow.PublicClient;
+                    break;
+            }
 
             var builder = PublicClientApplicationBuilder.Create(_clientId)
                 .WithDefaultRedirectUri()
                 .WithAuthority($"{_loginApi}/{tenantId}")
                 .WithHttpClientFactory(new GcMsalHttpClientFactory());
-            
 
             _publicClientApplication = builder.Build();
         }
 
         /// <summary>
-        /// Creates factory that supporrts Confidential client flows via MSAL with ClientSecret authentication
+        /// Creates factory that supports Confidential client flows via MSAL with ClientSecret authentication
         /// </summary>
         /// <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
         /// <param name="clientId">ClientId to use</param>
@@ -108,7 +117,6 @@ namespace GreyCorbel.Identity.Authentication
             _scopes = scopes;
 
             _flow = AuthenticationFlow.ConfidentialClient;
-
 
             var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithClientSecret(clientSecret)
@@ -155,7 +163,6 @@ namespace GreyCorbel.Identity.Authentication
             _scopes = scopes;
             _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory());
             _flow = AuthenticationFlow.ManagedIdentity;
-
         }
 
         /// <summary>
@@ -183,35 +190,70 @@ namespace GreyCorbel.Identity.Authentication
             AuthenticationResult result;
             switch(_flow)
             {
+                case AuthenticationFlow.PublicClientWithWia:
+                {
+                        var accounts = await _publicClientApplication.GetAccountsAsync();
+                        IAccount account;
+                        if (string.IsNullOrWhiteSpace(_userNameHint))
+                            account = accounts.FirstOrDefault();
+                        else
+                            account = accounts.Where(x => string.Compare(x.Username, _userNameHint, true) == 0).FirstOrDefault();
+                        if (null!=account)
+                        {
+                            result = await _publicClientApplication.AcquireTokenSilent(_scopes, account)
+                                .ExecuteAsync();
+                        }
+                        else
+                        {
+                            result = await _publicClientApplication.AcquireTokenByIntegratedWindowsAuth(_scopes)
+                                .ExecuteAsync(cts.Token);
+                            //let the app throw to caller when UI required as the purpose here is to stay silent
+                        }
+                        return result;
+                }
                 //public client flow
                 case AuthenticationFlow.PublicClient:
-                    var accounts = await _publicClientApplication.GetAccountsAsync();
-                    IAccount account;
-                    if (string.IsNullOrWhiteSpace(_userNameHint))
-                        account = accounts.FirstOrDefault();
-                    else
-                        account = accounts.Where(x => string.Compare(x.Username, _userNameHint, true) == 0).FirstOrDefault();
-
-                    try
                     {
-                        result = await _publicClientApplication.AcquireTokenSilent(_scopes, account)
-                                          .ExecuteAsync(cts.Token);
-                    }
-                    catch (MsalUiRequiredException)
-                    {
-                        result = _authMode switch
+                        var accounts = await _publicClientApplication.GetAccountsAsync();
+                        IAccount account;
+                        if (string.IsNullOrWhiteSpace(_userNameHint))
+                            account = accounts.FirstOrDefault();
+                        else
+                            account = accounts.Where(x => string.Compare(x.Username, _userNameHint, true) == 0).FirstOrDefault();
+                        try
                         {
-                            AuthenticationMode.Interactive => await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token),
-                            AuthenticationMode.DeviceCode => await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
-                            {
-                                Console.WriteLine(callback.Message);
-                                return Task.FromResult(0);
-                            }).ExecuteAsync(cts.Token),
-                            _ => throw new ArgumentException($"Unsupported Public client authentication mode: {_authMode}"),
-                        };
+                            result = await _publicClientApplication.AcquireTokenSilent(_scopes, account)
+                                              .ExecuteAsync(cts.Token);
+                        }
+                        catch (MsalUiRequiredException)
+                        {
+                            result = await _publicClientApplication.AcquireTokenInteractive(_scopes).ExecuteAsync(cts.Token);
+                        }
+                        return result;
                     }
-                    return result;
-
+                case AuthenticationFlow.PublicClientWithDeviceCode:
+                    {
+                        var accounts = await _publicClientApplication.GetAccountsAsync();
+                        IAccount account;
+                        if (string.IsNullOrWhiteSpace(_userNameHint))
+                            account = accounts.FirstOrDefault();
+                        else
+                            account = accounts.Where(x => string.Compare(x.Username, _userNameHint, true) == 0).FirstOrDefault();
+                        try
+                        {
+                            result = await _publicClientApplication.AcquireTokenSilent(_scopes, account)
+                                              .ExecuteAsync(cts.Token);
+                        }
+                        catch (MsalUiRequiredException)
+                        {
+                            result = await _publicClientApplication.AcquireTokenWithDeviceCode(_scopes, callback =>
+                                {
+                                    Console.WriteLine(callback.Message);
+                                    return Task.FromResult(0);
+                                }).ExecuteAsync(cts.Token);
+                        }
+                        return result;
+                    }
                 case AuthenticationFlow.ConfidentialClient:
                     return await _confidentialClientApplication.AcquireTokenForClient(_scopes).ExecuteAsync(cts.Token);
                 case AuthenticationFlow.ManagedIdentity:

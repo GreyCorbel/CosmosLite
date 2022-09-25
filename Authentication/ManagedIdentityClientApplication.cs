@@ -19,7 +19,6 @@ namespace GreyCorbel.Identity.Authentication
         AuthenticationResult _cachedToken = null;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
-        private readonly int _ticketOverlapSeconds = 300;
 
         public ManagedIdentityClientApplication(IMsalHttpClientFactory factory, string clientId = null)
         :base(factory, clientId)

@@ -52,7 +52,7 @@
         </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String,System.String[],System.String)">
             <summary>
-            Creates factory that supporrts Confidential client flows via MSAL with ClientSecret authentication
+            Creates factory that supports Confidential client flows via MSAL with ClientSecret authentication
             </summary>
             <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
             <param name="clientId">ClientId to use</param>

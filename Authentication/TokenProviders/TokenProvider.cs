@@ -21,6 +21,8 @@ namespace GreyCorbel.Identity.Authentication
         protected IMsalHttpClientFactory _httpClientFactory;
         protected readonly string _clientId = null;
 
+        protected readonly int _ticketOverlapSeconds = 300;
+
         public TokenProvider(IMsalHttpClientFactory factory, string clientId = null)
         {
             _httpClientFactory = factory;

@@ -13,6 +13,10 @@
         /// DeviceCode flow with authentication performed with code on different device
         /// </summary>
         DeviceCode,
+        /// <summary>
+        /// Windows Integrated Authentication - supported on machines joined to AD, or hybrid joined
+        /// </summary>
+        WIA,
     }
 
     /// <summary>
@@ -21,6 +25,8 @@
     enum AuthenticationFlow
     {
         PublicClient,
+        PublicClientWithDeviceCode,
+        PublicClientWithWia,
         ConfidentialClient,
         ManagedIdentity,
         UserAssignedIdentity
