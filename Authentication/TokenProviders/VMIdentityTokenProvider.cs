@@ -40,7 +40,7 @@ namespace GreyCorbel.Identity.Authentication
 
         HttpRequestMessage CreateRequestMessage(string[] scopes)
         {
-            using HttpRequestMessage message = new HttpRequestMessage();
+            HttpRequestMessage message = new HttpRequestMessage();
             message.Method = HttpMethod.Get;
             StringBuilder sb = new StringBuilder("http://169.254.169.254/metadata/identity/oauth2/token");
 

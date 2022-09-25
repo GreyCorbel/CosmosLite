@@ -29,6 +29,7 @@
         PublicClientWithWia,
         ConfidentialClient,
         ManagedIdentity,
-        UserAssignedIdentity
+        UserAssignedIdentity,
+        ResourceOwnerPassword
     }
 }

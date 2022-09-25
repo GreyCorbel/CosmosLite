@@ -16,9 +16,8 @@ namespace GreyCorbel.Identity.Authentication
 
     {
         ITokenProvider _tokenProvider = null;
-        AuthenticationResult _cachedToken = null;
+        Dictionary <string,AuthenticationResult> _cachedTokens = new Dictionary<string, AuthenticationResult>(StringComparer.InvariantCultureIgnoreCase);
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
-
 
         public ManagedIdentityClientApplication(IMsalHttpClientFactory factory, string clientId = null)
         :base(factory, clientId)
@@ -34,19 +33,23 @@ namespace GreyCorbel.Identity.Authentication
         public override async Task<AuthenticationResult> AcquireTokenForClientAsync(string[] scopes, CancellationToken cancellationToken)
         {
             await _lock.WaitAsync().ConfigureAwait(false);
-
             try
             {
-                if (null == _cachedToken || _cachedToken.ExpiresOn.UtcDateTime < DateTime.UtcNow.AddSeconds(-_ticketOverlapSeconds))
+                string resource = ScopeHelper.ScopeToResource(scopes);
+                if(! _cachedTokens.ContainsKey(resource) || _cachedTokens[resource].ExpiresOn.UtcDateTime < DateTime.UtcNow.AddSeconds(-_ticketOverlapSeconds))
                 {
                     if (null != _tokenProvider)
                     {
-                        _cachedToken = await _tokenProvider.AcquireTokenForClientAsync(scopes, cancellationToken).ConfigureAwait(false);
+                        _cachedTokens[resource] = await _tokenProvider.AcquireTokenForClientAsync(scopes, cancellationToken).ConfigureAwait(false);
                     }
                     else
                         throw new InvalidOperationException("Token provider not initialized");
                 }
-                return _cachedToken;
+                return _cachedTokens[resource];
+            }
+            catch(Exception ex)
+            {
+                throw ex;
             }
             finally
             {

@@ -25,15 +25,16 @@ This command returns AAD authentication factory for Public client auth flow with
         [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithCertificate')]
         [Parameter(Mandatory,ParameterSetName = 'PublicClient')]
+        [Parameter(Mandatory,ParameterSetName = 'ResourceOwnerPasssword')]
         [string]
             #Id of tenant where to autenticate the user. Can be tenant id, or any registerd DNS domain
         $TenantId,
 
         [Parameter()]
         [string]
-            #ClientId of application that gets token to CosmosDB.
-            #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
-        $ClientId = $script:DefaultClientId,
+            #ClientId of application that gets token
+            #Default: well-known clientId for Azure PowerShell
+        $ClientId,
 
         [Parameter(Mandatory)]
         [string[]]
@@ -46,6 +47,13 @@ This command returns AAD authentication factory for Public client auth flow with
             #Used to get access as application rather than as calling user
         $ClientSecret,
 
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [pscredential]
+            #Resource Owner username and password
+            #Used to get access as user
+            #Note: Does not work for federated authentication
+        $ResourceOwnerCredential,
+
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
         [System.Security.Cryptography.X509Certificates.X509Certificate2]
             #Authentication certificate for ClientID
@@ -55,20 +63,23 @@ This command returns AAD authentication factory for Public client auth flow with
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
         [Parameter(ParameterSetName = 'PublicClient')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
         $LoginApi = 'https://login.microsoftonline.com',
         
         [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
-        [ValidateSet('Interactive', 'DeviceCode')]
+        [ValidateSet('Interactive', 'DeviceCode', 'WIA')]
         [string]
-            #How to authenticate client - via web view or via device code flow
+            #How to authenticate client - via web view, via device code flow, or via Windows Integrated Auth
+            #Used in public client flows
         $AuthMode,
         
         [Parameter(ParameterSetName = 'PublicClient')]
         [string]
             #Username hint for authentication UI
+            #Optional
         $UserNameHint,
 
         [Parameter(ParameterSetName = 'MSI')]
@@ -94,14 +105,11 @@ This command returns AAD authentication factory for Public client auth flow with
                 break;
             }
             'MSI' {
-                if([string]::IsNullOrEmpty($ClientId) -or $ClientId -eq $script:DefaultClientId)
-                {
-                    $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($RequiredScopes)
-                }
-                else
-                {
-                    $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
-                }
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
+                break;
+            }
+            'ResourceOwnerPasssword' {
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $ResourceOwnerCredential.UserName, $ResourceOwnerCredential.Password, $LoginApi)
                 break;
             }
         }
@@ -136,13 +144,18 @@ Command creates authentication factory and retrieves AAD token from it
         [Parameter(ValueFromPipeline)]
         [GreyCorbel.Identity.Authentication.AadAuthenticationFactory]
             #AAD authentication factory created via New-AadAuthenticationFactory
-        $Factory = $script:AadLastCreatedFactory
+        $Factory = $script:AadLastCreatedFactory,
+        [Parameter()]
+            #Scopes to be returned in the token.
+            #If not specified, returns scopes provided when creating the factory
+        [string[]]$Scopes = $null
     )
 
     process
     {
         try {
-            $task = $factory.AuthenticateAsync()
+            #I don't know how to support Ctrl+Break
+            $task = $factory.AuthenticateAsync($scopes)
             $task.GetAwaiter().GetResult()
         }
         catch [System.OperationCanceledException] {
@@ -196,6 +209,7 @@ Command creates authentication factory, asks it to issue token for EventGrid and
             IsValid = $false
         }
 
+        #validate the result using published keys
         $endpoint = $result.Payload.iss.Replace('/v2.0','/')
 
         $signingKeys = Invoke-RestMethod -Method Get -Uri "$($endpoint)discovery/keys"
@@ -288,7 +302,6 @@ function Init
         Add-Type -Path "$PSScriptRoot\Shared\netstandard2.0\GreyCorbel.Identity.Authentication.dll"
 
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $script:DefaultClientId = '1950a258-227b-4e31-a9cf-717495945fc2'
     }
 }
 #endregion

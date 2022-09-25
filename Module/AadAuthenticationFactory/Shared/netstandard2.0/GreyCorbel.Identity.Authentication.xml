@@ -29,14 +29,14 @@
             Scopes the factory asks for when asking for tokens
             </summary>
         </member>
-        <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.AuthMode">
-            <summary>
-            Authentication mode for public client flows
-            </summary>
-        </member>
         <member name="P:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.UserName">
             <summary>
             UserName hint to use in authentication flows to help select proper user. Useful in case multiple accounts are logged in.
+            </summary>
+        </member>
+        <member name="F:GreyCorbel.Identity.Authentication.AadAuthenticationFactory._resourceOwnerPassword">
+            <summary>
+            Password for ROPC flow
             </summary>
         </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,GreyCorbel.Identity.Authentication.AuthenticationMode,System.String)">
@@ -44,7 +44,7 @@
             Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
             </summary>
             <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
-            <param name="clientId">ClientId to use</param>
+            <param name="clientId">ClientId to use. If not specified, clientId of Azure Powershell is used</param>
             <param name="scopes">List of scopes that clients asks for</param>
             <param name="loginApi">AAD endpoint that will handle the authentication.</param>
             <param name="authenticationMode">Type of public client flow to use</param>
@@ -70,12 +70,6 @@
             <param name="scopes">Scopes application asks for</param>
             <param name="loginApi">AAD endpoint URL for special instance of AAD (/e.g. US Gov)</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String[])">
-            <summary>
-            Creates factory that supports ManagedIdentity authentication
-            </summary>
-            <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array of scopes.</param>
-        </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String[])">
             <summary>
             Creates factory that supports UserAssignedIdentity authentication with provided client id
@@ -83,7 +77,18 @@
             <param name="clientId">AppId of User Assigned Identity</param>
             <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.AuthenticateAsync">
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,System.Security.SecureString,System.String)">
+            <summary>
+            Creates factory that supporrts Public client ROPC flow
+            </summary>
+            <param name="tenantId">DNS name or Id of tenant that authenticates user</param>
+            <param name="clientId">ClientId to use</param>
+            <param name="scopes">List of scopes that clients asks for</param>
+            <param name="loginApi">AAD endpoint that will handle the authentication.</param>
+            <param name="userName">Resource owner username and password</param>
+            <param name="password">Resource owner password</param>
+        </member>
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.AuthenticateAsync(System.String[])">
             <summary>
             Returns authentication result
             Microsoft says we should not instantiate directly - but how to achieve unified experience of caller without being able to return it?
@@ -104,6 +109,11 @@
         <member name="F:GreyCorbel.Identity.Authentication.AuthenticationMode.DeviceCode">
             <summary>
             DeviceCode flow with authentication performed with code on different device
+            </summary>
+        </member>
+        <member name="F:GreyCorbel.Identity.Authentication.AuthenticationMode.WIA">
+            <summary>
+            Windows Integrated Authentication - supported on machines joined to AD, or hybrid joined
             </summary>
         </member>
         <member name="T:GreyCorbel.Identity.Authentication.AuthenticationFlow">
