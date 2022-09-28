@@ -107,7 +107,6 @@ This command returns configuration object for working with CosmosDB account myCo
             #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
         $UseManagedIdentity,
 
-
         [Parameter()]
         [string]
             #Name of the proxy if connection to Azure has to go via proxy server

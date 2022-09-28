@@ -164,9 +164,10 @@ namespace GreyCorbel.Identity.Authentication
         }
 
         /// <summary>
-        /// Creates factory that supports UserAssignedIdentity authentication with provided client id
+        /// Creates factory that supports SystemAssignedIdentity (clientId passed is null) 
+        /// or UserAssignedIdentity (clientId parameter represents user assigned identity) authentication
         /// </summary>
-        /// <param name="clientId">AppId of User Assigned Identity</param>
+        /// <param name="clientId">AppId of User Assigned Identity or null (which means to use System Assigned Identity)</param>
         /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
         public AadAuthenticationFactory(string clientId, string[] scopes)
         {
