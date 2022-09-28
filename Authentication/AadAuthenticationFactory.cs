@@ -191,7 +191,7 @@ namespace GreyCorbel.Identity.Authentication
         /// <param name="clientId">ClientId to use</param>
         /// <param name="scopes">List of scopes that clients asks for</param>
         /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
-        /// <param name="userName">Resource owner username and password</param>
+        /// <param name="userName">Resource owner username</param>
         /// <param name="password">Resource owner password</param>
         public AadAuthenticationFactory(
             string tenantId,

@@ -62,6 +62,7 @@ This command returns configuration object for working with CosmosDB account myCo
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
         [string]
             #Id of tenant where to autenticate the user. Can be tenant id, or any registerd DNS domain
             #Not necessary when connecting with Managed Identity, otherwise ncesessary
@@ -84,6 +85,13 @@ This command returns configuration object for working with CosmosDB account myCo
             #Authentication certificate for ClientID
             #Used to get access as application rather than as calling user
         $X509Certificate,
+
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [pscredential]
+            #Resource Owner username and password
+            #Used to get access as user
+            #Note: Does not work for federated authentication
+        $ResourceOwnerCredential,
 
         [Parameter()]
         [string]
@@ -148,6 +156,10 @@ This command returns configuration object for working with CosmosDB account myCo
             }
             'MSI' {
                 $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes
+                break;
+            }
+            'ResourceOwnerPasssword' {
+                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential
                 break;
             }
         }
