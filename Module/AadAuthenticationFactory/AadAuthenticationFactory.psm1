@@ -18,10 +18,25 @@ Description
 -----------
 This command returns AAD authentication factory for Public client auth flow with well-known clientId for Azure PowerShell and interactive authentication for getting tokens for CosmosDB account
 
+.EXAMPLE
+$proxy=new-object System.Net.WebProxy('http://myproxy.mycompany.com:8080')
+$proxy.BypassProxyOnLocal=$true
+$factory = New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://eventgrid.azure.net/.default') -AuthMode deviceCode -Proxy $proxy
+$token = $factory | Get-AadToken
+
+Description
+-----------
+Command works in on prem environment where access to internet is available via proxy. Command authenticates user with device code flow.
+
 #>
 
     param
     (
+        [Parameter(Mandatory)]
+        [string[]]
+            #Scopes to ask token for
+        $RequiredScopes,
+
         [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(Mandatory,ParameterSetName = 'ConfidentialClientWithCertificate')]
         [Parameter(Mandatory,ParameterSetName = 'PublicClient')]
@@ -35,11 +50,6 @@ This command returns AAD authentication factory for Public client auth flow with
             #ClientId of application that gets token
             #Default: well-known clientId for Azure PowerShell
         $ClientId,
-
-        [Parameter(Mandatory)]
-        [string[]]
-            #Scopes to ask token for
-        $RequiredScopes,
 
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [string]
@@ -82,19 +92,17 @@ This command returns AAD authentication factory for Public client auth flow with
             #Optional
         $UserNameHint,
 
-        [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
-        [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
-        [Parameter(ParameterSetName = 'PublicClient')]
-        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
-        [System.Net.WebProxy]
-            #Web proxy configuration
-            #Optional
-        $proxy = $null,
-
         [Parameter(ParameterSetName = 'MSI')]
         [Switch]
             #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
-        $UseManagedIdentity
+        $UseManagedIdentity,
+
+        [Parameter()]
+        [System.Net.WebProxy]
+            #Web proxy configuration
+            #Optional
+        $proxy = $null
+
     )
 
     process
@@ -140,11 +148,29 @@ function Get-AadToken
 
 .EXAMPLE
 $factory = New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://eventgrid.azure.net/.default') -AuthMode Interactive
-$factory | Get-AadToken
+$token = $factory | Get-AadToken
 
 Description
 -----------
-Command creates authentication factory and retrieves AAD token from it
+Command creates authentication factory and retrieves AAD token from it, authenticating user via web view or browser
+
+.EXAMPLE
+$cosmosDbAccountName = 'myCosmosDBAcct
+$factory = New-AadAuthenticationFactory -RequiredScopes @("https://$cosmosDbAccountName`.documents.azure.com/.default") -UseManagedIdentity
+$token = $factory | Get-AadToken
+
+Description
+-----------
+Command creates authentication factory and retrieves AAD token for access data plane of cosmos DB aaccount.
+For deatils on CosmosDB RBAC access, see https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-setup-rbac
+
+.EXAMPLE
+$factory = New-AadAuthenticationFactory -TenantId mydomain.com  -RequiredScopes @('https://eventgrid.azure.net/.default') -AuthMode WIA
+$token = $factory | Get-AadToken
+
+Description
+-----------
+Command works in Federated environment with ADFS. Command authenticates user silently with current credentials against ADFS and uses ADFS token to retrieve token from AAD
 
 #>
 
