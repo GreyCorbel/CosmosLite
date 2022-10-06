@@ -39,7 +39,7 @@
             Password for ROPC flow
             </summary>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,GreyCorbel.Identity.Authentication.AuthenticationMode,System.String)">
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,GreyCorbel.Identity.Authentication.AuthenticationMode,System.String,System.Net.WebProxy)">
             <summary>
             Creates factory that supporrts Public client flows with Interactive or DeviceCode authentication
             </summary>
@@ -49,8 +49,9 @@
             <param name="loginApi">AAD endpoint that will handle the authentication.</param>
             <param name="authenticationMode">Type of public client flow to use</param>
             <param name="userNameHint">Which username to use in auth UI in case there may be multiple names available</param>
+            <param name="proxy">Optional configuration of proxy for internet access</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String,System.String[],System.String)">
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String,System.String[],System.String,System.Net.WebProxy)">
             <summary>
             Creates factory that supports Confidential client flows via MSAL with ClientSecret authentication
             </summary>
@@ -59,8 +60,9 @@
             <param name="scopes">List of scopes that clients asks for</param>
             <param name="loginApi">AAD endpoint that will handle the authentication.</param>
             <param name="clientSecret">Client secret to be used</param>
+            <param name="proxy">Optional configuration of proxy for internet access</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.Security.Cryptography.X509Certificates.X509Certificate2,System.String[],System.String)">
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.Security.Cryptography.X509Certificates.X509Certificate2,System.String[],System.String,System.Net.WebProxy)">
             <summary>
             Constructor for Confidential client authentication flow via MSAL and X509 certificate authentication
             </summary>
@@ -69,15 +71,18 @@
             <param name="clientCertificate">X509 certificate with private key. Public part of certificate is expected to be registered with app registration for given client id in AAD.</param>
             <param name="scopes">Scopes application asks for</param>
             <param name="loginApi">AAD endpoint URL for special instance of AAD (/e.g. US Gov)</param>
+            <param name="proxy">Optional configuration of proxy for internet access</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String[])">
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String[],System.Net.WebProxy)">
             <summary>
-            Creates factory that supports UserAssignedIdentity authentication with provided client id
+            Creates factory that supports SystemAssignedIdentity (clientId passed is null) 
+            or UserAssignedIdentity (clientId parameter represents user assigned identity) authentication
             </summary>
-            <param name="clientId">AppId of User Assigned Identity</param>
+            <param name="clientId">AppId of User Assigned Identity or null (which means to use System Assigned Identity)</param>
             <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
+            <param name="proxy">Optional configuration of proxy for internet access</param>
         </member>
-        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,System.Security.SecureString,System.String)">
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.#ctor(System.String,System.String,System.String[],System.String,System.Security.SecureString,System.String,System.Net.WebProxy)">
             <summary>
             Creates factory that supporrts Public client ROPC flow
             </summary>
@@ -85,8 +90,9 @@
             <param name="clientId">ClientId to use</param>
             <param name="scopes">List of scopes that clients asks for</param>
             <param name="loginApi">AAD endpoint that will handle the authentication.</param>
-            <param name="userName">Resource owner username and password</param>
+            <param name="userName">Resource owner username</param>
             <param name="password">Resource owner password</param>
+            <param name="proxy">Optional configuration of proxy for internet access</param>
         </member>
         <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.AuthenticateAsync(System.String[])">
             <summary>
@@ -95,6 +101,20 @@
             </summary>
             <returns cref="T:Microsoft.Identity.Client.AuthenticationResult">Authentication result object either returned fropm MSAL libraries, or - for ManagedIdentity - constructed from Managed Identity endpoint response, as returned by cref="ManagedIdentityClientApplication.ApiVersion" version of endpoint</returns>
             <exception cref="T:System.ArgumentException">Throws if unsupported authentication mode or flow detected</exception>
+        </member>
+        <member name="F:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.GetAncestorFlags.GetRootOwner">
+            <summary>
+            Retrieves the owned root window by walking the chain of parent and owner windows returned by GetParent.
+            </summary>
+        </member>
+        <member name="M:GreyCorbel.Identity.Authentication.AadAuthenticationFactory.GetAncestor(System.IntPtr,GreyCorbel.Identity.Authentication.AadAuthenticationFactory.GetAncestorFlags)">
+            <summary>
+            Retrieves the handle to the ancestor of the specified window.
+            </summary>
+            <param name="hwnd">A handle to the window whose ancestor is to be retrieved.
+            If this parameter is the desktop window, the function returns NULL. </param>
+            <param name="flags">The ancestor to be retrieved.</param>
+            <returns>The return value is the handle to the ancestor window.</returns>
         </member>
         <member name="T:GreyCorbel.Identity.Authentication.AuthenticationMode">
             <summary>

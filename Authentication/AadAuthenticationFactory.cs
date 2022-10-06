@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -66,13 +67,16 @@ namespace GreyCorbel.Identity.Authentication
         /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
         /// <param name="authenticationMode">Type of public client flow to use</param>
         /// <param name="userNameHint">Which username to use in auth UI in case there may be multiple names available</param>
+        /// <param name="proxy">Optional configuration of proxy for internet access</param>
+
         public AadAuthenticationFactory(
             string tenantId, 
             string clientId, 
             string [] scopes, 
             string loginApi = "https://login.microsoftonline.com", 
             AuthenticationMode authenticationMode = AuthenticationMode.Interactive, 
-            string userNameHint = null)
+            string userNameHint = null,
+            WebProxy proxy = null)
         {
             if (string.IsNullOrWhiteSpace(clientId))
                 _clientId = _defaultClientId;
@@ -84,10 +88,12 @@ namespace GreyCorbel.Identity.Authentication
             _userNameHint = userNameHint;
             _tenantId = tenantId;
 
+            bool useDefaultCredentials = false;
             switch(authenticationMode)
             {
                 case AuthenticationMode.WIA:
                     _flow = AuthenticationFlow.PublicClientWithWia;
+                    useDefaultCredentials = true;
                     break;
                 case AuthenticationMode.DeviceCode:
                     _flow = AuthenticationFlow.PublicClientWithDeviceCode;
@@ -100,7 +106,7 @@ namespace GreyCorbel.Identity.Authentication
             var builder = PublicClientApplicationBuilder.Create(_clientId)
                 .WithDefaultRedirectUri()
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+                .WithHttpClientFactory(new GcMsalHttpClientFactory(proxy, useDefaultCredentials));
 
             _publicClientApplication = builder.Build();
         }
@@ -113,12 +119,14 @@ namespace GreyCorbel.Identity.Authentication
         /// <param name="scopes">List of scopes that clients asks for</param>
         /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
         /// <param name="clientSecret">Client secret to be used</param>
+        /// <param name="proxy">Optional configuration of proxy for internet access</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
             string clientSecret,
             string[] scopes,
-            string loginApi = "https://login.microsoftonline.com")
+            string loginApi = "https://login.microsoftonline.com",
+            WebProxy proxy = null)
         {
             _clientId = clientId;
             _loginApi = loginApi;
@@ -129,7 +137,7 @@ namespace GreyCorbel.Identity.Authentication
             var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithClientSecret(clientSecret)
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+                .WithHttpClientFactory(new GcMsalHttpClientFactory(proxy));
 
             _confidentialClientApplication = builder.Build();
         }
@@ -142,12 +150,14 @@ namespace GreyCorbel.Identity.Authentication
         /// <param name="clientCertificate">X509 certificate with private key. Public part of certificate is expected to be registered with app registration for given client id in AAD.</param>
         /// <param name="scopes">Scopes application asks for</param>
         /// <param name="loginApi">AAD endpoint URL for special instance of AAD (/e.g. US Gov)</param>
+        /// <param name="proxy">Optional configuration of proxy for internet access</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
             X509Certificate2 clientCertificate,
             string[] scopes,
-            string loginApi = "https://login.microsoftonline.com")
+            string loginApi = "https://login.microsoftonline.com",
+            WebProxy proxy = null)
         {
             _clientId = clientId;
             _loginApi = loginApi;
@@ -158,7 +168,7 @@ namespace GreyCorbel.Identity.Authentication
             var builder = ConfidentialClientApplicationBuilder.Create(_clientId)
                 .WithCertificate(clientCertificate)
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+                .WithHttpClientFactory(new GcMsalHttpClientFactory(proxy));
 
             _confidentialClientApplication = builder.Build();
         }
@@ -169,7 +179,8 @@ namespace GreyCorbel.Identity.Authentication
         /// </summary>
         /// <param name="clientId">AppId of User Assigned Identity or null (which means to use System Assigned Identity)</param>
         /// <param name="scopes">Required scopes to obtain. Currently obtains all assigned scopes for first resource in the array.</param>
-        public AadAuthenticationFactory(string clientId, string[] scopes)
+        /// <param name="proxy">Optional configuration of proxy for internet access</param>
+        public AadAuthenticationFactory(string clientId, string[] scopes, WebProxy proxy = null)
         {
             _scopes = scopes;
             if (!string.IsNullOrWhiteSpace(clientId))
@@ -180,7 +191,7 @@ namespace GreyCorbel.Identity.Authentication
             { 
                 _clientId=null;
             }
-            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory(), _clientId);
+            _managedIdentityClientApplication = new ManagedIdentityClientApplication(new GcMsalHttpClientFactory(proxy), _clientId);
             _flow = AuthenticationFlow.UserAssignedIdentity;
         }
 
@@ -193,13 +204,15 @@ namespace GreyCorbel.Identity.Authentication
         /// <param name="loginApi">AAD endpoint that will handle the authentication.</param>
         /// <param name="userName">Resource owner username</param>
         /// <param name="password">Resource owner password</param>
+        /// <param name="proxy">Optional configuration of proxy for internet access</param>
         public AadAuthenticationFactory(
             string tenantId,
             string clientId,
             string[] scopes,
             string userName,
             SecureString password,
-            string loginApi = "https://login.microsoftonline.com"
+            string loginApi = "https://login.microsoftonline.com",
+            WebProxy proxy = null
             )
         {
             if (string.IsNullOrWhiteSpace(clientId))
@@ -218,7 +231,7 @@ namespace GreyCorbel.Identity.Authentication
             var builder = PublicClientApplicationBuilder.Create(_clientId)
                 .WithDefaultRedirectUri()
                 .WithAuthority($"{_loginApi}/{tenantId}")
-                .WithHttpClientFactory(new GcMsalHttpClientFactory());
+                .WithHttpClientFactory(new GcMsalHttpClientFactory(proxy));
 
             _publicClientApplication = builder.Build();
         }
@@ -252,7 +265,7 @@ namespace GreyCorbel.Identity.Authentication
                         }
                         else
                         {
-                            result = await _publicClientApplication.AcquireTokenByIntegratedWindowsAuth(_scopes)
+                            result = await _publicClientApplication.AcquireTokenByIntegratedWindowsAuth(_scopes).WithUsername(_userNameHint)
                                 .ExecuteAsync(cts.Token);
                             //let the app throw to caller when UI required as the purpose here is to stay silent
                         }
@@ -333,6 +346,42 @@ namespace GreyCorbel.Identity.Authentication
             }
 
             throw new ArgumentException($"Unsupported authentication flow: {_flow}");
+        }
+
+        void DebugLogging(LogLevel level, string message, bool containsPii)
+        {
+            Console.WriteLine($"MSAL {level} {containsPii} {message}");
+        }
+
+        enum GetAncestorFlags
+        {
+            GetParent = 1,
+            GetRoot = 2,
+            /// <summary>
+            /// Retrieves the owned root window by walking the chain of parent and owner windows returned by GetParent.
+            /// </summary>
+            GetRootOwner = 3
+        }
+
+        /// <summary>
+        /// Retrieves the handle to the ancestor of the specified window.
+        /// </summary>
+        /// <param name="hwnd">A handle to the window whose ancestor is to be retrieved.
+        /// If this parameter is the desktop window, the function returns NULL. </param>
+        /// <param name="flags">The ancestor to be retrieved.</param>
+        /// <returns>The return value is the handle to the ancestor window.</returns>
+        [DllImport("user32.dll", ExactSpelling = true)]
+        static extern IntPtr GetAncestor(IntPtr hwnd, GetAncestorFlags flags);
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
+
+        IntPtr GetConsoleOrTerminalWindow()
+        {
+            IntPtr consoleHandle = GetConsoleWindow();
+            IntPtr handle = GetAncestor(consoleHandle, GetAncestorFlags.GetRootOwner);
+
+            return handle;
         }
     }
 }

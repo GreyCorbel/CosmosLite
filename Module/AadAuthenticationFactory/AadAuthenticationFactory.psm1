@@ -82,6 +82,15 @@ This command returns AAD authentication factory for Public client auth flow with
             #Optional
         $UserNameHint,
 
+        [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
+        [Parameter(ParameterSetName = 'PublicClient')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [System.Net.WebProxy]
+            #Web proxy configuration
+            #Optional
+        $proxy = $null,
+
         [Parameter(ParameterSetName = 'MSI')]
         [Switch]
             #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
@@ -93,23 +102,23 @@ This command returns AAD authentication factory for Public client auth flow with
         switch($PSCmdlet.ParameterSetName)
         {
             'ConfidentialClientWithSecret' {
-                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $clientSecret, $RequiredScopes, $LoginApi,$proxy)
                 break;
             }
             'ConfidentialClientWithCertificate' {
-                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $X509Certificate, $RequiredScopes, $LoginApi,$proxy)
                 break;
             }
             'PublicClient' {
-                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $LoginApi, $AuthMode, $UserNameHint,$proxy)
                 break;
             }
             'MSI' {
-                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($ClientId, $RequiredScopes,$proxy)
                 break;
             }
             'ResourceOwnerPasssword' {
-                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $ResourceOwnerCredential.UserName, $ResourceOwnerCredential.Password, $LoginApi)
+                $script:AadLastCreatedFactory = new-object GreyCorbel.Identity.Authentication.AadAuthenticationFactory($tenantId, $ClientId, $RequiredScopes, $ResourceOwnerCredential.UserName, $ResourceOwnerCredential.Password, $LoginApi,$proxy)
                 break;
             }
         }
