@@ -8,10 +8,9 @@ This simple module is specialized on data manipulation in Cosmos DB. I originall
 
 So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authetication (no plans to add access key based auth)
 
-*Note*: For authentication, companion library GreyCorbel.Identity.Authentication is used, along with ADAL module Microsoft.Identity.Client. I don't like relying on compiled code, if someone knows how to implement Public and Confidential client flows directly in PowerShell, I would be happy to reuse - feel free to let me know.
+*Note*: CosmosLIie uses [AadAuthenticationFactory](https://github.com/GreyCorbel/AadAuthenticationFactory) module that implements various ways for authentication with Azure AD - form interactive login as user, over unattended authentication with Client ID and secret/certificate to AAD Managed Identity.
 
 I wish that Powershell would have built-in Public and Confidential client that would allow the same, so we would not have to pack dependencies and worry about MS modules version mismatches!
-
 
 ## Features
 Module offers the following features:
@@ -26,8 +25,8 @@ All operations return unified response object that contains below fields:
 - `IsSuccess`: Booleans success indicator
 - `HttpCode`: Http status code returned by CosmosDB REST API
 - `Charge`: RU charge caused by request processing
-- `Data`: Payload returned by REST API (if any)
-  - For commands that return documents, contains documents returned
+- `Data`: Payload returned by Cosmos DB REST API (if any)
+  - For commands that return documents, contains document(s) returned
   - For failed requests contains detailed error message returned by CosmosDB REST API as JSON string
 - `Continuation`: in case that operation returned partial dataset, contains continuation token to be used to retrieve next page of results
   - *Note*: Continuation for stored procedures returning large datasets needs to be implemented by stored procedure logic
@@ -54,6 +53,7 @@ Authentication library allows separate credentials for every CosmosDB account, s
 ## Samples
 Few sample below, also see help that comes with commands of the module.
 
+### Connection to DB
 ```powershell
 #connect to cosmos db account test-acct and db test with well-known clientId for Azure PowerShell (1950a258-227b-4e31-a9cf-717495945fc2)
 $ctx = Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydomain.com' -AuthMode Interactive
@@ -70,7 +70,10 @@ Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -Use
 
 #connect Cosmos with User assigned Managed Identiy
 Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+```
+### Working with documents
 
+```powershell
 #get document by id and partition key from container test-coll
 #first request causes authentication
 #this command uses automatically stored conteext from last Connect-Cosmos command
@@ -80,7 +83,10 @@ Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs'
 #first request causes authentication
 #this command uses explicit context to point to DB account and get appropriate credentials
 Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs' -Context $ctx
+```
+### Queries
 
+```powershell
 #invoke Cosmos query returning large resultset and measure total RU consumption
 $query = "select * from c where c.partitionKey = 'sample-docs'"
 $totalRU = 0
@@ -98,7 +104,60 @@ do
     throw $rslt.data
   }
 }while($null -ne $rslt.Continuation)
+
 ```
+### Stored procedures
+
+```powershell
+#invoke Cosmos stored procedure
+#  procedure takes 2 parameters - first is array of objects, second is a number
+#  parameter formatting is important - params have to be passed as an array with # of members same as # of parameters of procedure
+#  formatting is reponsibility of caller. Parameters are passed as JSON string representing properly formatted parameters
+
+$arrParam = @(
+  @{
+    key1 = "value1"
+    key2 = "value2"
+  },
+  @{
+    key1 = "value3"
+    key2 = "value4"
+  }
+)
+
+$numParam = 5
+
+$params = @($arrParam, $numParam) | ConvertTo-Json -AsArray
+
+$rslt = Invoke-CosmosStoredProcedure -Name sp_MyProc -Parameters $params -Collection myCollection -PartitionKey myPK
+  if($rslt.IsSuccess)
+  {
+    $totalRU+=$rslt.charge
+    $rslt.Data.Documents
+  }
+  else
+  {
+    #contains error returned by server
+    throw $rslt.data
+  }
+
+```
+
+### Partial document updates
+
+```powershell
+#Module supports Cosmos DB partial document updates
+#Updates are passed as an array of update specifrication objects
+#For easy working with updates, updates spec objects can be easily constructed by New-CosmosUpdateOperation command
+$Updates = @()
+$Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
+$Updates += New-CosmosUpdateOperation -Operation Add -TargetPath '/arrData/-' -value 'New value to be appended to the end of array data'
+
+#multiple updates are sent to Cosmos DB in single batch
+Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates
+
+```
+
 
 ## Roadmap
 Feel free to suggest features and functionality extensions.
