@@ -115,6 +115,10 @@ This command returns configuration object for working with CosmosDB account myCo
             #tries to get parameters from environment and token from internal endpoint provided by Azure MSI support
         $UseManagedIdentity,
 
+        [Switch]
+            #Whether to collect all response headers
+        $CollectResponseHeaders,
+
         [Parameter()]
         [string]
             #Name of the proxy if connection to Azure has to go via proxy server
@@ -135,36 +139,42 @@ This command returns configuration object for working with CosmosDB account myCo
             AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
             RetryCount = 10
+            Session = @{}
+            CollectResponseHeaders = $CollectResponseHeaders
         }
 
         $RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
 
         if($null -eq $script:AuthFactories) {$script:AuthFactories = @{}}
-        switch($PSCmdlet.ParameterSetName)
-        {
-            'PublicClient' {
-                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RequiredScopes $RequiredScopes -LoginApi $LoginApi -AuthMode $AuthMode -UserNameHint $UserNameHint
-                break;
-            }
-            'ConfidentialClientWithSecret' {
-                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi
-                break;
-            }
-            'ConfidentialClientWithCertificate' {
-                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -RequiredScopes $RequiredScopes -LoginApi $LoginApi
-                break;
-            }
-            'MSI' {
-                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes
-                break;
-            }
-            'ResourceOwnerPasssword' {
-                $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential
-                break;
-            }
+        try {
+                switch($PSCmdlet.ParameterSetName)
+                {
+                    'PublicClient' {
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RequiredScopes $RequiredScopes -LoginApi $LoginApi -AuthMode $AuthMode -UserNameHint $UserNameHint
+                        break;
+                    }
+                    'ConfidentialClientWithSecret' {
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                        break;
+                    }
+                    'ConfidentialClientWithCertificate' {
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                        break;
+                    }
+                    'MSI' {
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes
+                        break;
+                    }
+                    'ResourceOwnerPasssword' {
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential
+                        break;
+                    }
+                }
+                $script:Configuration | Select-Object Endpoint, RetryCount
         }
-
-        $script:Configuration
+        catch {
+            throw $_.Exception
+        }
     }
 }
 
@@ -210,7 +220,6 @@ This command retrieves configuration for specified CosmosDB account and database
         if($null -eq $script:AuthFactories[$context.AccountName])
         {
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
-
         }
 
         $script:AuthFactories[$context.AccountName].AuthenticateAsync().GetAwaiter().GetResult()
@@ -244,14 +253,17 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
         [string]
             #Id of the document
         $Id,
+
         [Parameter(Mandatory)]
         [string]
             #value of partition key for the document
         $PartitionKey,
+
         [Parameter(Mandatory)]
         [string]
             #Name of collection conaining the document
         $Collection,
+
         [Parameter()]
         [PSCustomObject]
             #Connection configuration object
@@ -266,11 +278,11 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Get
         $uri = "$url/$id"
         $rq.Uri = new-object System.Uri($uri)
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq -Context $Context
     }
 }
 
@@ -315,6 +327,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [string]
             #Name of the collection where to store document in
         $Collection,
+
         [switch]
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
@@ -332,13 +345,19 @@ This command creates new document with id = '123' and partition key 'test-docs' 
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey  -Type Document -Upsert:$IsUpsert
+        $rq = Get-CosmosRequest `
+            -PartitionKey $partitionKey `
+            -Type Document `
+            -Context $Context `
+            -Collection $Collection `
+            -Upsert:$IsUpsert
+        
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $uri = "$url"
         $rq.Uri = new-object System.Uri($uri)
         $rq.Payload = $Document
         $rq.ContentType = 'application/json'
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq -Context $Context
     }
 }
 
@@ -393,11 +412,11 @@ This command creates new document with id = '123' and partition key 'test-docs' 
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Delete
         $uri = "$url/$id"
         $rq.Uri = new-object System.Uri($uri)
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq -Context $Context
     }
 }
 
@@ -440,13 +459,16 @@ This command replaces field 'content' in root of the document with ID '123' and 
         [string]
             #Name of the collection containing updated document
         $Collection,
-
+        
         [Parameter(Mandatory)]
         [PSCustomObject[]]
             #List of updates to perform upon the document
             #Updates are constructed by command New-CosmosDocumentUpdate
         $Updates,
-
+        [Parameter()]
+        [string]
+            #condition evaluated by the server that must be met to perform the updates
+        $Condition,
         [Parameter()]
         [PSCustomObject]
             #Connection configuration object
@@ -461,15 +483,20 @@ This command replaces field 'content' in root of the document with ID '123' and 
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Patch
         $uri = "$url/$id"
         $rq.Uri = new-object System.Uri($uri)
-        $rq.Payload = @{
+        $patches = @{
             operations = $Updates
-        } | ConvertTo-Json -Depth 99
+        }
+        if(-not [string]::IsNullOrWhiteSpace($condition))
+        {
+            $patches['condition'] = $Condition
+        }
+        $rq.Payload =  $patches | ConvertTo-Json -Depth 99
         $rq.ContentType = 'application/json_patch+json'
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq -Context $Context
     }
 }
 
@@ -514,11 +541,20 @@ This command replaces field 'content' and adds value to array field 'arrData' in
             #value to be used by operation
         $Value
     )
-
+    begin
+    {
+        $ops = @{
+            Add = 'add'
+            Set = 'set'
+            Remove = 'remove'
+            Replace = 'replace'
+            Increment = 'incr'
+        }
+    }
     process
     {
-        [PSCustomObject][ordered]@{
-            op = $Operation.ToLower()
+        [PSCustomObject]@{
+            op = $ops[$Operation]
             path = $TargetPath
             value = $Value
         }
@@ -585,13 +621,13 @@ This command replaces entire document with ID '123' and partition key 'test-docs
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Put
         $uri = "$url/$id"
         $rq.Uri = new-object System.Uri($uri)
         $rq.Payload = $Document
         $rq.ContentType = 'application/json'
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq -Context $Context
     }
 }
 #endregion
@@ -636,6 +672,12 @@ This command performs cross partition query and iteratively fetches all matching
             #Query string
         $Query,
 
+        [Parameter()]
+        [System.Collections.Hashtable]
+            #Query parameters if the query string contains parameter placeholders
+            #Parameter names must start with '@' char
+        $QueryParameters,
+
         [Parameter(Mandatory)]
         [string]
             #Name of the collection
@@ -672,17 +714,34 @@ This command performs cross partition query and iteratively fetches all matching
     process
     {
 
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Query -MaxItems $MaxItems
-        $data = @{
+        $rq = Get-CosmosRequest `
+            -PartitionKey $partitionKey `
+            -Type Query `
+            -MaxItems $MaxItems `
+            -Continuation $ContinuationToken `
+            -Context $Context `
+            -Collection $Collection
+
+        $QueryDefinition = @{
             query = $Query
+        }
+        if($null -ne $QueryParameters)
+        {
+            $QueryDefinition['parameters']=@()
+            foreach($key in $QueryParameters.Keys)
+            {
+                $QueryDefinition['parameters']+=@{
+                    name=$key
+                    value=$QueryParameters[$key]
+                }
+            }
         }
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $uri = "$url"
-        $rq.Uri = new-object System.Uri($uri)
-        $rq.Payload = ($data | Convertto-json)
+        $rq.Uri = New-Object System.Uri($uri)
+        $rq.Payload = ($QueryDefinition | ConvertTo-Json)
         $rq.ContentType = 'application/query+json'
-        $rq.Continuation = $ContinuationToken
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq -Context $Context
     }
 }
 
@@ -752,14 +811,19 @@ This command calls stored procedure and shows result.
     process
     {
 
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type SpCall -MaxItems $MaxItems
+        $rq = Get-CosmosRequest `
+            -PartitionKey $partitionKey `
+            -Type SpCall `
+            -MaxItems $MaxItems `
+            -Context $Context `
+            -Collection $Collection
+        
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $uri = "$url/$Name"
         $rq.Uri = new-object System.Uri($uri)
         $rq.Payload = $Parameters
         $rq.ContentType = 'application/json'
-        $rq.Continuation = $ContinuationToken
-        ProcessRequestWithRetryInternal -rq $rq
+        ProcessRequestWithRetryInternal -rq $rq  -Context $Context
     }
 }
 
@@ -781,7 +845,7 @@ function Set-CosmosRetryCount
 
 Description
 -----------
-This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
+This command sets maximus retries for throttled requests to 20
 #>
 
     [CmdletBinding()]
@@ -806,48 +870,69 @@ This command replaces field 'content' in root of the document with ID '123' and 
 #endregion
 
 #region CosmosLiteInternals
-function FormatCosmosResponseInternal
+function ProcessCosmosResponseInternal
 {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
         [System.Net.Http.HttpResponseMessage]
-        $rsp
+        $rsp,
+        [Parameter(Mandatory)]
+        $Context,
+        [Parameter(Mandatory)]
+        $Collection
     )
 
     begin
     {
-        $retVal = [PSCustomObject]@{
+        $provider =  [System.Globalization.CultureInfo]::CreateSpecificCulture("en-US")
+    }
+    process
+    {
+        $retVal=[ordered]@{
             IsSuccess = $false
             HttpCode = 0
             Charge = -1
             Data = $null
             Continuation = $null
         }
-        $provider =  [System.Globalization.CultureInfo]::CreateSpecificCulture("en-US")
-    }
-    process
-    {
-        $retVal.IsSuccess = $rsp.IsSuccessStatusCode
-        $retVal.HttpCode = $rsp.StatusCode
+
+        $retVal['IsSuccess'] = $rsp.IsSuccessStatusCode
+        $retVal['HttpCode'] = $rsp.StatusCode
         $val = $null
+        #retrieve important headers
         if($rsp.Headers.TryGetValues('x-ms-request-charge', [ref]$val)) {
-            $retVal.Charge = [double]::Parse($val[0],$provider)
+            $retVal['Charge'] = [double]::Parse($val[0],$provider)
         }
+        
         if($rsp.Headers.TryGetValues('x-ms-continuation', [ref]$val)) {
-            $retVal.Continuation = $val[0]
+            $retVal['Continuation'] = $val[0]
         }
+
+        #store session token for container
+        if($rsp.Headers.TryGetValues('x-ms-session-token', [ref]$val)) {
+            $Context.Session[$Collection] = $val[0]
+        }
+        #get raw response headers
+        if($Context.CollectResponseHeaders)
+        {
+            $retVal['Headers']=@{}
+            $rsp.Headers.ForEach{
+                $retVal['Headers']["$($_.Key)"] = $_.Value
+            }
+        }
+        #retrieve response data
         if($null -ne $rsp.Content)
         {
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
             try {
-                $retVal.Data = ($s | ConvertFrom-Json -ErrorAction Stop)
+                $retVal['Data'] = ($s | ConvertFrom-Json -ErrorAction Stop)
             }
             catch {
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
-        return $retVal
+        return [PSCustomObject]$retVal
     }
 }
 function ProcessRequestWithRetryInternal
@@ -855,7 +940,9 @@ function ProcessRequestWithRetryInternal
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
-        [PSCustomObject]$rq
+        [PSCustomObject]$rq,
+        [Parameter(Mandatory)]
+        $Context
     )
 
     process
@@ -866,7 +953,9 @@ function ProcessRequestWithRetryInternal
                 $request = GetCosmosRequestInternal -rq $rq
                 $rsp = $script:httpClient.SendAsync($request).GetAwaiter().GetResult()
                 $request.Dispose()
-                if($rsp.IsSuccessStatusCode) {return (FormatCosmosResponseInternal -rsp $rsp)}
+                if($rsp.IsSuccessStatusCode) {
+                    return (ProcessCosmosResponseInternal -rsp $rsp -Context $Context -Collection $rq.Collection)
+                }
                 if($rsp.StatusCode -eq 429 -and $rq.maxRetries -gt 0)
                 {
                     $val = $null
@@ -874,7 +963,7 @@ function ProcessRequestWithRetryInternal
                     Start-Sleep -Milliseconds $wait
                     $rq.maxRetries--
                 }
-                else {return (FormatCosmosResponseInternal -rsp $rsp)}
+                else {return (ProcessCosmosResponseInternal -rsp $rsp -Context $Context -Collection $rq.Collection)}
     
             }
             catch {
@@ -900,6 +989,11 @@ function GetCosmosRequestInternal {
         $retVal.Headers.Add('x-ms-version', '2018-12-31')
         $retVal.RequestUri = $rq.Uri
         $retVal.Method = $rq.Method
+        if(-not [string]::IsNullOrEmpty($rq.Session))
+        {
+            Write-Verbose "Setting 'x-ms-session-token' to $($rq.Session)"
+            $retVal.Headers.Add('x-ms-session-token', $rq.Session)
+        }
 
         switch($rq.Type)
         {
@@ -930,6 +1024,7 @@ function GetCosmosRequestInternal {
                 break;
             }
             {$_ -in 'SpCall','Document'} {
+                Write-Verbose "Setting Content"
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
                 break
@@ -958,6 +1053,7 @@ function Get-CosmosRequest
         [NUllable[UInt32]]$MaxItems,
         [string]$Continuation,
         [string]$PartitionKey,
+        [string]$Collection,
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
@@ -974,6 +1070,7 @@ function Get-CosmosRequest
             Type = $Type
             MaxItems = $MaxItems
             Continuation = $Continuation
+            Session = $Context.Session[$Collection]
             Upsert = $Upsert
             PartitionKey = $PartitionKey
             Method = $null
@@ -981,6 +1078,7 @@ function Get-CosmosRequest
             Payload = $null
             ContentType = $null
             MaxRetries = $Context.RetryCount
+            Collection=$Collection
         }
     }
 }
