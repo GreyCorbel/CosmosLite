@@ -31,12 +31,14 @@ All operations return unified response object that contains below fields:
 - `Continuation`: in case that operation returned partial dataset, contains continuation token to be used to retrieve next page of results
   - *Note*: Continuation for stored procedures returning large datasets needs to be implemented by stored procedure logic
 
+Optionally, response object may also contain Headers field - complete set of headers as returned by server. This functionality is turned on via `CollectResponseHeader` switch of `Connect-Cosmos` command and may be usable for troubleshooting.
+
 ## Authentication
 Module supports OAuth authentication with AAD in Delegated and Application contexts.
 
 No other authentication mechanisms are currently supported - I don't plan to implement them here and want to focus on RBAC and OAuth only. Target audience is both ad-hoc interactive scripting (with Delegated authentication) and backend processes with explicit app identity (authentication with ClientSecret or X.509 certificate) or implicit identity (authenticated with Azure Managed Identity)
 
-Authentication uses simple library that implements Public and Confidential client flows, and authentication with Azure Managed Identity.
+Authentication is implemented by utility module [AadAuthenticationFactory](https://github.com/GreyCorbel/AadAuthenticationFactory) this module depends on.
 
 For Public client flow, authentication uses well-known ClientId for Azure Powershell by defsault, or you can use your app registered with your tenant, if you wish.
 
@@ -44,11 +46,9 @@ For Confidential client flow, use own ClientId with Client Secret or Certificate
 
 For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function - all cases with System Managed Identity and User Managed Identity.
 
-Library relies on Microsoft.Identity.Client assembly that is also packed with module. 
-
 Supported authentication flows for Public client are `Interactive` (via web view/browser) or `DeviceCode` (with code displayed on command line and authentication handled by user in independent browser session)
 
-Authentication library allows separate credentials for every CosmosDB account, so in single script / powershell session, you can connect to multiple CosmosDB accounts with different credentials at the same time.
+Authentication allows separate credentials for every Cosmos DB account, so in single script / powershell session, you can connect to multiple Cosmos DB accounts with different credentials at the same time.
 
 ## Samples
 Few sample below, also see help that comes with commands of the module.
@@ -68,8 +68,12 @@ Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -Ten
 #connect Cosmos with System assigned Managed Identiy
 Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -UseManagedIdentity
 
-#connect Cosmos with User assigned Managed Identiy
+#connect Cosmos with User assigned Managed Identity
 Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+
+#connect Cosmos with User assigned Managed Identity and collect server response headers
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity -CollectResponseHeaders
+
 ```
 ### Working with documents
 
@@ -85,7 +89,7 @@ Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs'
 Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs' -Context $ctx
 ```
 ### Queries
-
+Query completely built in powershell code:
 ```powershell
 #invoke Cosmos query returning large resultset and measure total RU consumption
 $query = "select * from c where c.partitionKey = 'sample-docs'"
@@ -105,13 +109,36 @@ do
   }
 }while($null -ne $rslt.Continuation)
 
+Parametrized query:
+```powershell
+#invoke Cosmos query returning large resultset and measure total RU consumption
+$query = "select * from c where c.partitionKey = @pk"
+$queryParams=@{
+  '@pk' = 'sample-docs'
+}
+$totalRU = 0
+do
+{
+  $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParameters -PartitionKey 'sample-docs' -ContinuationToken $rslt.Continuation
+  if($rslt.IsSuccess)
+  {
+    $totalRU+=$rslt.charge
+    $rslt.Data.Documents
+  }
+  else
+  {
+    #contains error returned by server
+    throw $rslt.data
+  }
+}while($null -ne $rslt.Continuation)
+
 ```
 ### Stored procedures
-
+Invoke Cosmos stored procedure:
 ```powershell
 #invoke Cosmos stored procedure
 #  procedure takes 2 parameters - first is array of objects, second is a number
-#  parameter formatting is important - params have to be passed as an array with # of members same as # of parameters of procedure
+#  parameter formatting is important - params have to be passed as an array with # of members same as # of parameters of procedure, so as they are properly processed
 #  formatting is reponsibility of caller. Parameters are passed as JSON string representing properly formatted parameters
 
 $arrParam = @(
@@ -144,18 +171,39 @@ $rslt = Invoke-CosmosStoredProcedure -Name sp_MyProc -Parameters $params -Collec
 ```
 
 ### Partial document updates
-
+Unconditional update:
 ```powershell
 #Module supports Cosmos DB partial document updates
-#Updates are passed as an array of update specifrication objects
+#Updates are passed as an array of update specification objects
 #For easy working with updates, updates spec objects can be easily constructed by New-CosmosUpdateOperation command
 $Updates = @()
-$Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
+$Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for property content'
 $Updates += New-CosmosUpdateOperation -Operation Add -TargetPath '/arrData/-' -value 'New value to be appended to the end of array data'
 
 #multiple updates are sent to Cosmos DB in single batch
 Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates
-
+```
+Conditional update: document is updated only when `content` field is not defined on the document
+```powershell
+#Module supports Cosmos DB partial document updates
+#Updates are passed as an array of update specification objects
+#For easy working with updates, updates spec objects can be easily constructed by New-CosmosUpdateOperation command
+$Updates = @()
+$Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for property content'
+$condition = 'from c where is_defined(c.content)'
+$rslt = Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates -Condition $condition
+if(-not $rslt.IsSuccess)
+{
+  if($rslt.HttpCode -eq [System.Net.HttpStatusCode]::PreconditionFailed)
+  {
+    #document was not updated
+  }
+  else
+  {
+    #other error - throw error returned by server
+    throw $rsp.Data
+  }
+}
 ```
 
 
