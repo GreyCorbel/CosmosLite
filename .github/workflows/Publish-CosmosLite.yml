@@ -25,6 +25,7 @@ jobs:
       shell: pwsh
       run: |
         Copy-Item -Path "$env:GITHUB_WORKSPACE\LICENSE" -Destination "$env:GITHUB_WORKSPACE\Module\CosmosLite\LICENSE.txt" -Force
+        &"$env:GITHUB_WORKSPACE\Commands\BuildModule.ps1" -RootPath "$env:GITHUB_WORKSPACE"
 
     - name: Publish
       #Publish to PS Gallery
@@ -45,15 +46,3 @@ jobs:
           Write-Host "Error: $($_.Exception)"
           throw
         }
-    
-    - name: Create Release
-      #Create a release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions automatically
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
