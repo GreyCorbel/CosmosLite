@@ -12,9 +12,9 @@ function Update-CosmosDocument
     Response describing result of operation
 
 .EXAMPLE
-    $Updates = @()
-    $Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
-    Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates
+    $DocUpdate = New-CosmosDocumentUpdate -Id '123' -PartitionKey 'test-docs'
+    $DocUpdate.Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
+    Update-CosmosDocument -UpdateObject $DocUpdate -Collection 'docs'
 
 Description
 -----------
@@ -23,35 +23,27 @@ This command replaces field 'content' in root of the document with ID '123' and 
 
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory)]
-        [string]
-            #Id of the document
-        $Id,
-
-        [Parameter(Mandatory)]
-        [string]
-            #Partition key of the document
-        $PartitionKey,
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [PSCustomObject]
+            #Object representing document update specification produced by New-CosmosDocumentUpdate
+            #and containing collection od up to 10 updates produced by New-CosmosUpdateOperation
+        $UpdateObject,
 
         [Parameter(Mandatory)]
         [string]
             #Name of the collection containing updated document
         $Collection,
         
-        [Parameter(Mandatory)]
-        [PSCustomObject[]]
-            #List of updates to perform upon the document
-            #Updates are constructed by command New-CosmosDocumentUpdate
-        $Updates,
-        [Parameter()]
-        [string]
-            #condition evaluated by the server that must be met to perform the updates
-        $Condition,
         [Parameter()]
         [PSCustomObject]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1
     )
 
     begin
@@ -61,19 +53,18 @@ This command replaces field 'content' in root of the document with ID '123' and 
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
+        $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Patch
-        $uri = "$url/$id"
-        $rq.Uri = new-object System.Uri($uri)
+        $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
         $patches = @{
-            operations = $Updates
+            operations = $UpdateObject.Updates
         }
-        if(-not [string]::IsNullOrWhiteSpace($condition))
+        if(-not [string]::IsNullOrWhiteSpace($UpdateObject.Condition))
         {
-            $patches['condition'] = $Condition
+            $patches['condition'] = $UpdateObject.Condition
         }
         $rq.Payload =  $patches | ConvertTo-Json -Depth 99
         $rq.ContentType = 'application/json_patch+json'
-        ProcessRequestWithRetryInternal -rq $rq -Context $Context
+        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize $BatchSize
     }
 }

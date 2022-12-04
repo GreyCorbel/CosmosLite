@@ -24,21 +24,32 @@ This command replaces entire document with ID '123' and partition key 'test-docs
 #>
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
         [string]
             #Id of the document to be replaced
         $Id,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
         [string]
             #new document data
         $Document,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
         [string]
             #Partition key of document to be replaced
         $PartitionKey,
 
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #Object representing document to create
+            #Command performs JSON serialization via ConvertTo-Json -Depth 99
+        $DocumentObject,
+
+        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #attribute of DocumentObject used as partition key
+        $PartitionKeyAttribute,
+        
         [Parameter(Mandatory)]
         [string]
             #Name of collection containing the document
@@ -58,6 +69,14 @@ This command replaces entire document with ID '123' and partition key 'test-docs
 
     process
     {
+        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
+        {
+            #to change document Id, you cannot use DocumentObject parameter set
+            $Id = $DocumentObject.id
+            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            $Document = ConvertTo-Json -Depth 99
+        }
+
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Put
         $uri = "$url/$id"

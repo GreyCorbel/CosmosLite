@@ -20,15 +20,25 @@ This command creates new document with id = '123' and partition key 'test-docs' 
 
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipeline)]
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'RawPayload')]
         [string]
             #Id of the document
         $Id,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
         [string]
             #Partition key value of the document
         $PartitionKey,
+
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #Object representing document to remove
+        $DocumentObject,
+
+        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #attribute of DocumentObject used as partition key
+            $PartitionKeyAttribute,
 
         [Parameter(Mandatory)]
         [string]
@@ -39,7 +49,12 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [PSCustomObject]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1
     )
 
     begin
@@ -49,10 +64,14 @@ This command creates new document with id = '123' and partition key 'test-docs' 
 
     process
     {
+        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
+        {
+            $Id = $DocumentObject.id
+            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+        }
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Delete
-        $uri = "$url/$id"
-        $rq.Uri = new-object System.Uri($uri)
-        ProcessRequestWithRetryInternal -rq $rq -Context $Context
+        $rq.Uri = new-object System.Uri("$url/$id")
+        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize $BatchSize
     }
 }

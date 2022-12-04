@@ -25,15 +25,26 @@ This command creates new document with id = '123' and partition key 'test-docs' 
 
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipeline)]
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'RawPayload')]
         [string]
             #JSON string representing the document data
         $Document,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
         [string]
             #Partition key of new document
         $PartitionKey,
+
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #Object representing document to create
+            #Command performs JSON serialization via ConvertTo-Json -Depth 99
+        $DocumentObject,
+
+        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #attribute of DocumentObject used as partition key
+        $PartitionKeyAttribute,
 
         [Parameter(Mandatory)]
         [string]
@@ -47,16 +58,28 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [PSCustomObject]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1
     )
 
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
     {
+        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
+        {
+            $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
+            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+        }
+
         $rq = Get-CosmosRequest `
             -PartitionKey $partitionKey `
             -Type Document `
@@ -65,10 +88,21 @@ This command creates new document with id = '123' and partition key 'test-docs' 
             -Upsert:$IsUpsert
         
         $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $uri = "$url"
-        $rq.Uri = new-object System.Uri($uri)
+        $rq.Uri = new-object System.Uri($url)
         $rq.Payload = $Document
         $rq.ContentType = 'application/json'
-        ProcessRequestWithRetryInternal -rq $rq -Context $Context
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }

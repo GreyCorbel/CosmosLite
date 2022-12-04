@@ -73,6 +73,6 @@ This command calls stored procedure and shows result.
         $rq.Uri = new-object System.Uri($uri)
         $rq.Payload = $Parameters
         $rq.ContentType = 'application/json'
-        ProcessRequestWithRetryInternal -rq $rq  -Context $Context
+        ProcessRequestBatchedWithRetryInternal -rq $rq  -Context $Context
     }
 }

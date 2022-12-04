@@ -106,6 +106,6 @@ This command performs cross partition query and iteratively fetches all matching
         $rq.Uri = New-Object System.Uri($uri)
         $rq.Payload = ($QueryDefinition | ConvertTo-Json)
         $rq.ContentType = 'application/query+json'
-        ProcessRequestWithRetryInternal -rq $rq -Context $Context
+        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context
     }
 }
