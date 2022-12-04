@@ -51,8 +51,7 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
     {
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Get
-        $uri = "$url/$id"
-        $rq.Uri = new-object System.Uri($uri)
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context
+        $rq.Uri = new-object System.Uri("$url/$id")
+        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
     }
 }

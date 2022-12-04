@@ -12,12 +12,15 @@ function Invoke-CosmosQuery
     Response describing result of operation
 
 .EXAMPLE
-    $query = "select * from c where c.itemType = 'person'"
+    $query = "select * from c where c.itemType = @itemType"
+    $queryParams = @{
+        '@itemType' = 'person'
+    }
     $totalRuConsumption = 0
     $data = @()
     do
     {
-        $rsp = Invoke-CosmosQuery -Query $query -Collection 'test-docs' -ContinuationToken $rsp.Continuation
+        $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' -ContinuationToken $rsp.Continuation
         if($rsp.IsSuccess)
         {
             $data += $rsp.data.Documents
@@ -27,7 +30,7 @@ function Invoke-CosmosQuery
 
 Description
 -----------
-This command performs cross partition query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
 #>
 
     [CmdletBinding()]
@@ -106,6 +109,7 @@ This command performs cross partition query and iteratively fetches all matching
         $rq.Uri = New-Object System.Uri($uri)
         $rq.Payload = ($QueryDefinition | ConvertTo-Json)
         $rq.ContentType = 'application/query+json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context
+
+        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
     }
 }

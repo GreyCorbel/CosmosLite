@@ -60,6 +60,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
@@ -72,6 +73,19 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Delete
         $rq.Uri = new-object System.Uri("$url/$id")
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize $BatchSize
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }

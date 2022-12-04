@@ -64,14 +64,11 @@ function ProcessRequestBatchInternal
             {
                 $outstandingRequests=@()
                 $maxRetries--
+                Write-Verbose "Throttled`tRequestsToRetry`t$($requestsToRetry.Count)`tWaitTime`t$waitTime`tRetriesRemaining`t$maxRetries"
                 Start-Sleep -Milliseconds $waitTime
                 foreach($cosmosRequest in $requestsToRetry)
                 {
-                    $outstandingRequests+=@{
-                        CosmosLiteRequest = $rq
-                        HttpRequest = $httpRequest
-                        HttpTask = $script:httpClient.SendAsync($httpRequest)
-                    }
+                    $outstandingRequests+=SendRequestInternal -rq $cosmosRequest -Context $Context
                 }
             }
             else {

@@ -276,9 +276,8 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
     {
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Get
-        $uri = "$url/$id"
-        $rq.Uri = new-object System.Uri($uri)
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context
+        $rq.Uri = new-object System.Uri("$url/$id")
+        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
     }
 }
 function Invoke-CosmosQuery
@@ -389,7 +388,8 @@ This command performs cross partition query and iteratively fetches all matching
         $rq.Uri = New-Object System.Uri($uri)
         $rq.Payload = ($QueryDefinition | ConvertTo-Json)
         $rq.ContentType = 'application/query+json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context
+
+        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
     }
 }
 function Invoke-CosmosStoredProcedure
@@ -423,7 +423,7 @@ This command calls stored procedure and shows result.
             #Name of stored procedure to call
         $Name,
 
-        [Parameter()]
+        [Parameter(ValueFromPipeline)]
         [string]
             #Array of parameters to pass to stored procedure
             #When passing array of objects as single parameter, be sure that array is properly formatted so as it is to single parameter object rather than array of parameters
@@ -444,17 +444,22 @@ This command calls stored procedure and shows result.
         [PSCustomObject]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1
     )
 
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/sprocs"
+        $outstandingRequests=@()
     }
 
     process
     {
-
         $rq = Get-CosmosRequest `
             -PartitionKey $partitionKey `
             -Type SpCall `
@@ -463,11 +468,107 @@ This command calls stored procedure and shows result.
             -Collection $Collection
         
         $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $uri = "$url/$Name"
-        $rq.Uri = new-object System.Uri($uri)
+        $rq.Uri = new-object System.Uri("$url/$Name")
         $rq.Payload = $Parameters
         $rq.ContentType = 'application/json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq  -Context $Context
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
+    }
+}
+function New-CosmosDocumentUpdate
+{
+<#
+.SYNOPSIS
+    Constructs document update specification object expected by Update-CosmosDocument command
+
+.DESCRIPTION
+    Constructs document update description. Used together with Update-CosmosDocument and New-CosmoUpdateOperation commands.
+    
+.OUTPUTS
+    Document update specification
+
+.EXAMPLE
+    $query = 'select * from c where c.quantity < @threshold'
+    $queryParams = @{
+        '@threshold' = 10
+    }
+    $cntinuation = $null
+    do
+    {
+        $rslt = Invoke-CosmosQuery -Query $query -$QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
+        if(!$rslt.IsSuccess)
+        {
+            throw $rslt.Data
+        }
+        $rslt.Data.Documents | Foreach-Object {
+            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute
+            $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
+        } | Update-CosmosDocument -Collection 'test-docs' -BatchSize 4
+        $continuation = $rslt.Continuation
+    }while'$null -ne $continuation
+
+Description
+-----------
+This command increaments field 'quantity' by 50 on each documents that have value of this fields lower than 10
+Update is performed in parallel
+#>
+
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
+        [string]
+            #Id of the document to be replaced
+        $Id,
+
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
+        [string]
+            #Partition key of new document
+        $PartitionKey,
+
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #Object representing document to create
+            #Command performs JSON serialization via ConvertTo-Json -Depth 99
+        $DocumentObject,
+
+        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #attribute of DocumentObject used as partition key
+        $PartitionKeyAttribute,
+
+        [Parameter()]
+        [string]
+            #condition evaluated by the server that must be met to perform the updates
+        $Condition
+    )
+
+
+    process
+    {
+        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
+        {
+            $id = $DocumentObject.id
+            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+        }
+
+        [PSCustomObject]@{
+            Id = $Id
+            PartitionKey = $PartitionKey
+            Condition = $Condition
+            Updates = @()
+        }
     }
 }
 function New-CosmosDocument
@@ -700,6 +801,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
@@ -712,7 +814,20 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Delete
         $rq.Uri = new-object System.Uri("$url/$id")
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize $BatchSize
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }
 function Set-CosmosDocument
@@ -748,7 +863,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
         [string]
-            #new document data as JSON string
+            #new document data
         $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
@@ -758,20 +873,15 @@ This command replaces entire document with ID '123' and partition key 'test-docs
 
         [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
         [PSCustomObject]
-            #Object representing document
+            #Object representing document to create
             #Command performs JSON serialization via ConvertTo-Json -Depth 99
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
         [PSCustomObject]
             #attribute of DocumentObject used as partition key
-            $PartitionKeyAttribute,
-
-        [Parameter()]
-        [int]
-            #Degree of paralelism
-        $BatchSize=1,
-
+        $PartitionKeyAttribute,
+        
         [Parameter(Mandatory)]
         [string]
             #Name of collection containing the document
@@ -787,23 +897,39 @@ This command replaces entire document with ID '123' and partition key 'test-docs
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
     {
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
-            $Document = $DocumentObject | ConvertTo-Json -Depth 99
-            $id = $DocumentObject.id
+            #to change document Id, you cannot use DocumentObject parameter set
+            $Id = $DocumentObject.id
             $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            $Document = ConvertTo-Json -Depth 99 -Compress
         }
 
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Put
-        $rq.Uri = new-object System.Uri("$url/$id")
+        $uri = "$url/$id"
+        $rq.Uri = new-object System.Uri($uri)
         $rq.Payload = $Document
         $rq.ContentType = 'application/json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize $BatchSize
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }
 function Set-CosmosRetryCount
@@ -860,9 +986,9 @@ function Update-CosmosDocument
     Response describing result of operation
 
 .EXAMPLE
-    $Updates = @()
-    $Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
-    Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates
+    $DocUpdate = New-CosmosDocumentUpdate -Id '123' -PartitionKey 'test-docs'
+    $DocUpdate.Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
+    Update-CosmosDocument -UpdateObject $DocUpdate -Collection 'docs'
 
 Description
 -----------
@@ -871,74 +997,64 @@ This command replaces field 'content' in root of the document with ID '123' and 
 
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
-            #Id of the document
-        $Id,
-
-        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
-            #Partition key of the document
-        $PartitionKey,
-
-        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
+        [Parameter(Mandatory, ValueFromPipeline)]
         [PSCustomObject]
-            #Object representing document to update
-            #Command performs JSON serialization via ConvertTo-Json -Depth 99
-        $DocumentObject,
-
-        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
-            #attribute of DocumentObject used as partition key
-        $PartitionKeyAttribute,
+            #Object representing document update specification produced by New-CosmosDocumentUpdate
+            #and containing collection od up to 10 updates produced by New-CosmosUpdateOperation
+        $UpdateObject,
 
         [Parameter(Mandatory)]
         [string]
             #Name of the collection containing updated document
         $Collection,
         
-        [Parameter(Mandatory)]
-        [PSCustomObject[]]
-            #List of updates to perform upon the document
-            #Updates are constructed by command New-CosmosDocumentUpdate
-        $Updates,
-        [Parameter()]
-        [string]
-            #condition evaluated by the server that must be met to perform the updates
-        $Condition,
         [Parameter()]
         [PSCustomObject]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1
     )
 
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
     {
-        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
-        {
-            $id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
-        }
-
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
+        $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Patch
-        $rq.Uri = new-object System.Uri("$url/$id")
+        $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
         $patches = @{
-            operations = $Updates
+            operations = $UpdateObject.Updates
         }
-        if(-not [string]::IsNullOrWhiteSpace($condition))
+        if(-not [string]::IsNullOrWhiteSpace($UpdateObject.Condition))
         {
-            $patches['condition'] = $Condition
+            $patches['condition'] = $UpdateObject.Condition
         }
-        $rq.Payload =  $patches | ConvertTo-Json -Depth 99
+        $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
         $rq.ContentType = 'application/json_patch+json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize 1
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }
 #endregion Public commands
@@ -995,7 +1111,7 @@ function GetCosmosRequestInternal {
         $retVal.Method = $rq.Method
         if(-not [string]::IsNullOrEmpty($rq.Session))
         {
-            Write-Verbose "Setting 'x-ms-session-token' to $($rq.Session)"
+            #Write-Verbose "Setting 'x-ms-session-token' to $($rq.Session)"
             $retVal.Headers.Add('x-ms-session-token', $rq.Session)
         }
 
@@ -1004,7 +1120,7 @@ function GetCosmosRequestInternal {
             'Query' {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
-                Write-Verbose "Setting 'x-ms-documentdb-isquery' to True"
+                #Write-Verbose "Setting 'x-ms-documentdb-isquery' to True"
                 $retVal.Headers.Add('x-ms-documentdb-isquery', 'True')
 
                 #avoid RequestTooLarge error because of continuation token size
@@ -1012,23 +1128,22 @@ function GetCosmosRequestInternal {
 
                 if($null -ne $rq.MaxItems)
                 {
-                    Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
+                    #Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
                     $retVal.Headers.Add('x-ms-max-item-count', $rq.MaxItems)
                 }
                 if([string]::IsNullOrEmpty($rq.PartitionKey))
                 {
-                    Write-Verbose "Setting 'x-ms-documentdb-query-enablecrosspartition' to True"
+                    #Write-Verbose "Setting 'x-ms-documentdb-query-enablecrosspartition' to True"
                     $retVal.Headers.Add('x-ms-documentdb-query-enablecrosspartition', 'True')
                 }
                 if(-not [string]::IsNullOrEmpty($rq.Continuation))
                 {
-                    Write-Verbose "Setting 'x-ms-continuation' to $($rq.Continuation)"
+                    #Write-Verbose "Setting 'x-ms-continuation' to $($rq.Continuation)"
                     $retVal.Headers.Add('x-ms-continuation', $rq.Continuation)
                 }
                 break;
             }
             {$_ -in 'SpCall','Document'} {
-                Write-Verbose "Setting Content"
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
                 break
@@ -1037,12 +1152,12 @@ function GetCosmosRequestInternal {
         }
         if($rq.Upsert)
         {
-            Write-Verbose "Setting 'x-ms-documentdb-is-upsert' to True"
+            #Write-Verbose "Setting 'x-ms-documentdb-is-upsert' to True"
             $retVal.Headers.Add('x-ms-documentdb-is-upsert', 'True');
         }
         if(-not [string]::IsNullOrEmpty($rq.PartitionKey))
         {
-            Write-Verbose "Setting 'x-ms-documentdb-partitionkey' to [`"$($rq.PartitionKey)`"]"
+            #Write-Verbose "Setting 'x-ms-documentdb-partitionkey' to [`"$($rq.PartitionKey)`"]"
             $retVal.Headers.Add('x-ms-documentdb-partitionkey', "[`"$($rq.PartitionKey)`"]")
         }
 
@@ -1114,46 +1229,6 @@ function ProcessCosmosResponseInternal
         return [PSCustomObject]$retVal
     }
 }
-function ProcessRequestBatchedWithRetryInternal
-{
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory,ValueFromPipeline)]
-        [PSCustomObject]$rq,
-        [Parameter(Mandatory)]
-        $Context,
-        [Parameter()]
-        [int]$BatchSize=1
-    )
-
-    begin
-    {
-        $outstandingRequests=@()
-    }
-    process
-    {
-        $httpRequest = GetCosmosRequestInternal -rq $rq
-        #pair our request to task for possible retry and batch executing tasks
-        $outstandingRequests+=[PSCustomObject]@{
-            CosmosLiteRequest = $rq
-            HttpRequest = $httpRequest
-            HttpTask = $script:httpClient.SendAsync($httpRequest)
-        }
-
-        if($outstandingRequests.Count -ge $batchSize)
-        {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
-        }
-    }
-    end
-    {
-        if($outstandingRequests.Count -gt 0)
-        {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-        }
-    }
-}
 function ProcessRequestBatchInternal
 {
     [CmdletBinding()]
@@ -1178,7 +1253,6 @@ function ProcessRequestBatchInternal
             [System.Threading.Tasks.Task]::WaitAll($outstandingRequests.HttpTask)
             
             #process reponses
-            $results = @()
             #bag for requests to retry
             $requestsToRetry=@()
             #total time to wait in case of throttled
@@ -1194,7 +1268,7 @@ function ProcessRequestBatchInternal
                 $cosmosRequest = $request.CosmosLiteRequest
                 if($httpResponse.IsSuccessStatusCode) {
                     #successful - process response
-                    $results+= ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
+                    ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
                 }
                 else
                 {
@@ -1209,28 +1283,23 @@ function ProcessRequestBatchInternal
                     }
                     else {
                         #failed or maxRetries exhausted
-                        $results+= ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
+                        ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
                     }
                 }
                 #dispose httpResponseMessage
                 $httpResponse.Dispose()
             }
-            #return complete results
-            foreach($result in $results) {$result}
 
             #retry throttled requests
             if($requestsToRetry.Count -gt 0)
             {
                 $outstandingRequests=@()
                 $maxRetries--
+                Write-Verbose "Throttled`tRequestsToRetry`t$($requestsToRetry.Count)`tWaitTime`t$waitTime`tRetriesRemaining`t$maxRetries"
                 Start-Sleep -Milliseconds $waitTime
                 foreach($cosmosRequest in $requestsToRetry)
                 {
-                    $outstandingRequests+=@{
-                        CosmosLiteRequest = $rq
-                        HttpRequest = $httpRequest
-                        HttpTask = $script:httpClient.SendAsync($httpRequest)
-                    }
+                    $outstandingRequests+=SendRequestInternal -rq $cosmosRequest -Context $Context
                 }
             }
             else {
@@ -1238,47 +1307,6 @@ function ProcessRequestBatchInternal
                 break
             }
         }while($true)
-    }
-}
-function ProcessRequestWithRetryInternal
-{
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory)]
-        [PSCustomObject]$rq,
-        [Parameter(Mandatory)]
-        $Context
-    )
-
-    
-    process
-    {
-        do {
-
-            try {
-                $request = GetCosmosRequestInternal -rq $rq
-                $rsp = $script:httpClient.SendAsync($request).GetAwaiter().GetResult()
-                $request.Dispose()
-                if($rsp.IsSuccessStatusCode) {
-                    return (ProcessCosmosResponseInternal -rsp $rsp -Context $Context -Collection $rq.Collection)
-                }
-                if($rsp.StatusCode -eq 429 -and $rq.maxRetries -gt 0)
-                {
-                    $val = $null
-                    if($rsp.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) {$wait = [long]$val[0]} else {$wait=1000}
-                    Start-Sleep -Milliseconds $wait
-                    $rq.maxRetries--
-                }
-                else {return (ProcessCosmosResponseInternal -rsp $rsp -Context $Context -Collection $rq.Collection)}
-    
-            }
-            catch {
-                throw $_.Exception
-            }
-            finally {
-                if($null -ne $rsp) {$rsp.Dispose()}
-            }
-        } until ($false)
     }
 }
 function SendRequestInternal

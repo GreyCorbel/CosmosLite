@@ -29,10 +29,10 @@ This command calls stored procedure and shows result.
             #Name of stored procedure to call
         $Name,
 
-        [Parameter()]
+        [Parameter(ValueFromPipeline)]
         [string]
-            #Array of parameters to pass to stored procedure
-            #When passing array of objects as single parameter, be sure that array is properly formatted so as it is to single parameter object rather than array of parameters
+            #Array of parameters to pass to stored procedure, serialized to JSON string
+            #When passing array of objects as single parameter, be sure that array is properly formatted so as it is a single parameter object rather than array of parameters
         $Parameters,
 
         [Parameter(Mandatory)]
@@ -50,17 +50,22 @@ This command calls stored procedure and shows result.
         [PSCustomObject]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration
+        $Context = $script:Configuration,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1
     )
 
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/sprocs"
+        $outstandingRequests=@()
     }
 
     process
     {
-
         $rq = Get-CosmosRequest `
             -PartitionKey $partitionKey `
             -Type SpCall `
@@ -69,10 +74,22 @@ This command calls stored procedure and shows result.
             -Collection $Collection
         
         $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $uri = "$url/$Name"
-        $rq.Uri = new-object System.Uri($uri)
+        $rq.Uri = new-object System.Uri("$url/$Name")
         $rq.Payload = $Parameters
         $rq.ContentType = 'application/json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq  -Context $Context
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }

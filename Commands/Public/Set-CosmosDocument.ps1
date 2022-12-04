@@ -65,6 +65,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
@@ -74,15 +75,27 @@ This command replaces entire document with ID '123' and partition key 'test-docs
             #to change document Id, you cannot use DocumentObject parameter set
             $Id = $DocumentObject.id
             $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
-            $Document = ConvertTo-Json -Depth 99
+            $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
         }
 
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Put
-        $uri = "$url/$id"
-        $rq.Uri = new-object System.Uri($uri)
+        $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ContentType = 'application/json'
-        ProcessRequestWithRetryInternal -rq $rq -Context $Context
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }

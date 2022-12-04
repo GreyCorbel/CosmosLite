@@ -14,7 +14,7 @@ function GetCosmosRequestInternal {
         $retVal.Method = $rq.Method
         if(-not [string]::IsNullOrEmpty($rq.Session))
         {
-            Write-Verbose "Setting 'x-ms-session-token' to $($rq.Session)"
+            #Write-Verbose "Setting 'x-ms-session-token' to $($rq.Session)"
             $retVal.Headers.Add('x-ms-session-token', $rq.Session)
         }
 
@@ -23,7 +23,7 @@ function GetCosmosRequestInternal {
             'Query' {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
-                Write-Verbose "Setting 'x-ms-documentdb-isquery' to True"
+                #Write-Verbose "Setting 'x-ms-documentdb-isquery' to True"
                 $retVal.Headers.Add('x-ms-documentdb-isquery', 'True')
 
                 #avoid RequestTooLarge error because of continuation token size
@@ -31,23 +31,22 @@ function GetCosmosRequestInternal {
 
                 if($null -ne $rq.MaxItems)
                 {
-                    Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
+                    #Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
                     $retVal.Headers.Add('x-ms-max-item-count', $rq.MaxItems)
                 }
                 if([string]::IsNullOrEmpty($rq.PartitionKey))
                 {
-                    Write-Verbose "Setting 'x-ms-documentdb-query-enablecrosspartition' to True"
+                    #Write-Verbose "Setting 'x-ms-documentdb-query-enablecrosspartition' to True"
                     $retVal.Headers.Add('x-ms-documentdb-query-enablecrosspartition', 'True')
                 }
                 if(-not [string]::IsNullOrEmpty($rq.Continuation))
                 {
-                    Write-Verbose "Setting 'x-ms-continuation' to $($rq.Continuation)"
+                    #Write-Verbose "Setting 'x-ms-continuation' to $($rq.Continuation)"
                     $retVal.Headers.Add('x-ms-continuation', $rq.Continuation)
                 }
                 break;
             }
             {$_ -in 'SpCall','Document'} {
-                Write-Verbose "Setting Content"
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
                 break
@@ -56,12 +55,12 @@ function GetCosmosRequestInternal {
         }
         if($rq.Upsert)
         {
-            Write-Verbose "Setting 'x-ms-documentdb-is-upsert' to True"
+            #Write-Verbose "Setting 'x-ms-documentdb-is-upsert' to True"
             $retVal.Headers.Add('x-ms-documentdb-is-upsert', 'True');
         }
         if(-not [string]::IsNullOrEmpty($rq.PartitionKey))
         {
-            Write-Verbose "Setting 'x-ms-documentdb-partitionkey' to [`"$($rq.PartitionKey)`"]"
+            #Write-Verbose "Setting 'x-ms-documentdb-partitionkey' to [`"$($rq.PartitionKey)`"]"
             $retVal.Headers.Add('x-ms-documentdb-partitionkey', "[`"$($rq.PartitionKey)`"]")
         }
 

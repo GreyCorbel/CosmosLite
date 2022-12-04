@@ -18,7 +18,7 @@ function New-CosmosDocumentUpdate
     $cntinuation = $null
     do
     {
-        $rslt = Invoke-CosmosQuery -Query $query -$QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
+        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
         if(!$rslt.IsSuccess)
         {
             throw $rslt.Data
@@ -28,12 +28,12 @@ function New-CosmosDocumentUpdate
             $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
         } | Update-CosmosDocument -Collection 'test-docs' -BatchSize 4
         $continuation = $rslt.Continuation
-    }while'$null -ne $continuation
+    }while($null -ne $continuation)
 
 Description
 -----------
-This command increaments field 'quantity' by 50 on each documents that have value of this fields lower than 10
-Update is performed in parallel
+This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
+Update is performed in parallel; up to 4 updates are performed at the same time
 #>
 
     [CmdletBinding()]
@@ -64,7 +64,6 @@ Update is performed in parallel
             #condition evaluated by the server that must be met to perform the updates
         $Condition
     )
-
 
     process
     {

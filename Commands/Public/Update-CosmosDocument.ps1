@@ -49,6 +49,7 @@ This command replaces field 'content' in root of the document with ID '123' and 
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
@@ -63,8 +64,22 @@ This command replaces field 'content' in root of the document with ID '123' and 
         {
             $patches['condition'] = $UpdateObject.Condition
         }
-        $rq.Payload =  $patches | ConvertTo-Json -Depth 99
+        $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
         $rq.ContentType = 'application/json_patch+json'
-        ProcessRequestBatchedWithRetryInternal -rq $rq -Context $Context -BatchSize $BatchSize
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }
