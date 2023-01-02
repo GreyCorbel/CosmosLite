@@ -11,7 +11,7 @@ function Remove-CosmosDocument
     Response describing result of operation
 
 .EXAMPLE
-    Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -IsUpsert
+    Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
 Description
 -----------
@@ -38,7 +38,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
         [PSCustomObject]
             #attribute of DocumentObject used as partition key
-            $PartitionKeyAttribute,
+        $PartitionKeyAttribute,
 
         [Parameter(Mandatory)]
         [string]
