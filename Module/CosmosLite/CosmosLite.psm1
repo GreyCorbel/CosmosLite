@@ -163,7 +163,15 @@ This command returns configuration object for working with CosmosDB account myCo
                         break;
                     }
                     'MSI' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes
+                        if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
+                        {
+                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes -UseManagedIdentity
+                        }
+                        else 
+                        {
+                            #default clientId does not fit here - we do not pass it to the factory
+                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -RequiredScopes $RequiredScopes -UseManagedIdentity
+                        }
                         break;
                     }
                     'ResourceOwnerPasssword' {
@@ -294,12 +302,15 @@ function Invoke-CosmosQuery
     Response describing result of operation
 
 .EXAMPLE
-    $query = "select * from c where c.itemType = 'person'"
+    $query = "select * from c where c.itemType = @itemType"
+    $queryParams = @{
+        '@itemType' = 'person'
+    }
     $totalRuConsumption = 0
     $data = @()
     do
     {
-        $rsp = Invoke-CosmosQuery -Query $query -Collection 'test-docs' -ContinuationToken $rsp.Continuation
+        $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' -ContinuationToken $rsp.Continuation
         if($rsp.IsSuccess)
         {
             $data += $rsp.data.Documents
@@ -309,7 +320,7 @@ function Invoke-CosmosQuery
 
 Description
 -----------
-This command performs cross partition query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
 #>
 
     [CmdletBinding()]
@@ -425,8 +436,8 @@ This command calls stored procedure and shows result.
 
         [Parameter(ValueFromPipeline)]
         [string]
-            #Array of parameters to pass to stored procedure
-            #When passing array of objects as single parameter, be sure that array is properly formatted so as it is to single parameter object rather than array of parameters
+            #Array of parameters to pass to stored procedure, serialized to JSON string
+            #When passing array of objects as single parameter, be sure that array is properly formatted so as it is a single parameter object rather than array of parameters
         $Parameters,
 
         [Parameter(Mandatory)]
@@ -507,7 +518,7 @@ function New-CosmosDocumentUpdate
     $cntinuation = $null
     do
     {
-        $rslt = Invoke-CosmosQuery -Query $query -$QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
+        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
         if(!$rslt.IsSuccess)
         {
             throw $rslt.Data
@@ -517,12 +528,12 @@ function New-CosmosDocumentUpdate
             $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
         } | Update-CosmosDocument -Collection 'test-docs' -BatchSize 4
         $continuation = $rslt.Continuation
-    }while'$null -ne $continuation
+    }while($null -ne $continuation)
 
 Description
 -----------
-This command increaments field 'quantity' by 50 on each documents that have value of this fields lower than 10
-Update is performed in parallel
+This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
+Update is performed in parallel; up to 4 updates are performed at the same time
 #>
 
     [CmdletBinding()]
@@ -553,7 +564,6 @@ Update is performed in parallel
             #condition evaluated by the server that must be met to perform the updates
         $Condition
     )
-
 
     process
     {
@@ -752,7 +762,7 @@ function Remove-CosmosDocument
     Response describing result of operation
 
 .EXAMPLE
-    Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -IsUpsert
+    Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
 Description
 -----------
@@ -779,7 +789,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
         [PSCustomObject]
             #attribute of DocumentObject used as partition key
-            $PartitionKeyAttribute,
+        $PartitionKeyAttribute,
 
         [Parameter(Mandatory)]
         [string]
@@ -907,13 +917,12 @@ This command replaces entire document with ID '123' and partition key 'test-docs
             #to change document Id, you cannot use DocumentObject parameter set
             $Id = $DocumentObject.id
             $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
-            $Document = ConvertTo-Json -Depth 99 -Compress
+            $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
         }
 
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Put
-        $uri = "$url/$id"
-        $rq.Uri = new-object System.Uri($uri)
+        $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ContentType = 'application/json'
 

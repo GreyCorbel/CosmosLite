@@ -27,6 +27,11 @@ jobs:
         Copy-Item -Path "$env:GITHUB_WORKSPACE\LICENSE" -Destination "$env:GITHUB_WORKSPACE\Module\CosmosLite\LICENSE.txt" -Force
         &"$env:GITHUB_WORKSPACE\Commands\BuildModule.ps1" -RootPath "$env:GITHUB_WORKSPACE"
 
+    - name: Install prerequisites
+      shell: pwsh
+      run: |
+        Install-Module AadAuthenticationFactory -Force
+      
     - name: Publish
       #Publish to PS Gallery
       shell: pwsh
@@ -36,8 +41,6 @@ jobs:
         write-host "Publishing from: $env:GITHUB_WORKSPACE\Module\CosmosLite"
         try
         {
-          #create folder for dependencies
-          md "$env:GITHUB_WORKSPACE\Module\AadAuthenticationFactory" -ErrorAction SilentlyContinue
           #setup PSModulePath
           $env:PSModulePath = "$env:PSModulePath;$env:GITHUB_WORKSPACE\Module"
           "PSModulePath: $env:PSModulePath"
