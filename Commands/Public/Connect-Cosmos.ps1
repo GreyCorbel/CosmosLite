@@ -162,7 +162,15 @@ This command returns configuration object for working with CosmosDB account myCo
                         break;
                     }
                     'MSI' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes
+                        if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
+                        {
+                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes -UseManagedIdentity
+                        }
+                        else 
+                        {
+                            #default clientId does not fit here - we do not pass it to the factory
+                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -RequiredScopes $RequiredScopes -UseManagedIdentity
+                        }
                         break;
                     }
                     'ResourceOwnerPasssword' {
