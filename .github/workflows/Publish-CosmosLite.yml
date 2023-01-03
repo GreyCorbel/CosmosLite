@@ -36,6 +36,9 @@ jobs:
         write-host "Publishing from: $env:GITHUB_WORKSPACE\Module\CosmosLite"
         try
         {
+          #create folder for dependencies
+          md "$env:GITHUB_WORKSPACE\Module\AadAuthenticationFactory" -ErrorAction SilentlyContinue
+          #setup PSModulePath
           $env:PSModulePath = "$env:PSModulePath;$env:GITHUB_WORKSPACE\Module"
           "PSModulePath: $env:PSModulePath"
 
