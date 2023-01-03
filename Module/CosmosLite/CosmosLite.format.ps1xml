@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Configuration>
+    <ViewDefinitions>
+        <View>
+        <Name>CosmosLiteConnectionConfig</Name>
+        <ViewSelectedBy>
+            <TypeName>CosmosLite.Connection.Configuration</TypeName>
+        </ViewSelectedBy>
+        <TableControl>
+            <TableRowEntries>
+            <TableRowEntry>
+                <TableColumnItems>
+                    <TableColumnItem>
+                        <PropertyName>AccountName</PropertyName>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <PropertyName>RetryCount</PropertyName>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <PropertyName>CollectResponseHeaders</PropertyName>
+                    </TableColumnItem>
+                </TableColumnItems>
+            </TableRowEntry>
+            </TableRowEntries>
+        </TableControl>
+        </View>
+    </ViewDefinitions>
+</Configuration>

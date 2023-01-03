@@ -179,7 +179,8 @@ This command returns configuration object for working with CosmosDB account myCo
                         break;
                     }
                 }
-                $script:Configuration | Select-Object Endpoint, RetryCount
+                $script:Configuration.psobject.typenames.Insert(0,'CosmosLite.Connection.Configuration')
+                $script:Configuration
         }
         catch {
             throw $_.Exception
