@@ -30,7 +30,7 @@ jobs:
     - name: Install prerequisites
       shell: pwsh
       run: |
-        Install-Module AadAuthenticationFactory -Force
+        Install-Module AadAuthenticationFactory -Force -Scope CurrentUser
       
     - name: Publish
       #Publish to PS Gallery
