@@ -5,7 +5,7 @@ function Set-CosmosDocument
     Replaces document with new document
 
 .DESCRIPTION
-    replaces document data completely with new data. Document must exist for oepration to succeed.
+    Replaces document data completely with new data. Document must exist for oepration to succeed.
     
 .OUTPUTS
     Response describing result of operation
