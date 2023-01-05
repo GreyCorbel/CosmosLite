@@ -24,5 +24,37 @@
             </TableRowEntries>
         </TableControl>
         </View>
+        <View>
+        <Name>CosmosLiteResponse</Name>
+        <ViewSelectedBy>
+            <TypeName>CosmosLite.Response</TypeName>
+        </ViewSelectedBy>
+        <TableControl>
+            <TableHeaders>
+            <TableColumnHeader>
+                <Width>16</Width>
+            </TableColumnHeader>
+            <TableColumnHeader>
+                <Width>8</Width>
+            </TableColumnHeader>
+            <TableColumnHeader />
+            </TableHeaders>
+            <TableRowEntries>
+            <TableRowEntry>
+                <TableColumnItems>
+                    <TableColumnItem>
+                        <PropertyName>HttpCode</PropertyName>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <PropertyName>Charge</PropertyName>
+                    </TableColumnItem>
+                    <TableColumnItem>
+                        <PropertyName>Data</PropertyName>
+                    </TableColumnItem>
+                </TableColumnItems>
+            </TableRowEntry>
+            </TableRowEntries>
+        </TableControl>
+        </View>
     </ViewDefinitions>
 </Configuration>

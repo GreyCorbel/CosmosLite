@@ -30,7 +30,8 @@ function ProcessCosmosResponseInternal
         $val = $null
         #retrieve important headers
         if($rsp.Headers.TryGetValues('x-ms-request-charge', [ref]$val)) {
-            $retVal['Charge'] = [double]::Parse($val[0],$provider)
+            #we do not want fractions of RU - round to whole number
+            $retVal['Charge'] = [int][double]::Parse($val[0],$provider)
         }
         
         if($rsp.Headers.TryGetValues('x-ms-continuation', [ref]$val)) {
@@ -60,6 +61,9 @@ function ProcessCosmosResponseInternal
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
-        return [PSCustomObject]$retVal
+        #return typed object
+        $cosmosResponse = [PSCustomObject]$retVal
+        $cosmosResponse.psobject.typenames.Insert(0,'CosmosLite.Response') | Out-Null
+        $cosmosResponse
     }
 }
