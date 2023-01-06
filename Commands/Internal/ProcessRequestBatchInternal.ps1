@@ -46,8 +46,8 @@ function ProcessRequestBatchInternal
                         #get waitTime
                         $val = $null
                         if($httpResponse.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) {$wait = [long]$val[0]} else {$wait=1000}
-                        #we wait for total time returned by all 429 responses
-                        $waitTime+= $wait
+                        #we wait for longest time returned by all 429 responses
+                        if($waitTime -lt $wait) {$waitTime = $wait}
                         $requestsToRetry+=$cosmosRequest
                     }
                     else {

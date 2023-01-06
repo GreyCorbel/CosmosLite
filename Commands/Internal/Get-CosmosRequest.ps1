@@ -9,7 +9,6 @@ function Get-CosmosRequest
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
-        [switch]$Patch,
         [PSCustomObject]$Context = $script:Configuration
     )
 
