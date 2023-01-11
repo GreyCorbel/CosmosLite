@@ -40,6 +40,6 @@ This command retrieves configuration for specified CosmosDB account and database
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
         }
 
-        $script:AuthFactories[$context.AccountName].AuthenticateAsync().GetAwaiter().GetResult()
+        Get-AadToken -Factory $script:AuthFactories[$context.AccountName]
     }
 }
