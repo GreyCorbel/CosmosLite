@@ -45,14 +45,14 @@ For Public client flow, authentication uses well-known ClientId for Azure Powers
 
 For Confidential client flow, use own ClientId with Client Secret or Certificate.
 
-For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function - all cases with System Managed Identity and User Managed Identity.
+For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function - all cases with System Managed Identity and User-assigned Managed Identity.
 
 Supported authentication flows for Public client are `Interactive` (via web view/browser) or `DeviceCode` (with code displayed on command line and authentication handled by user in independent browser session)
 
 Authentication allows separate credentials for every Cosmos DB account, so in single script / powershell session, you can connect to multiple Cosmos DB accounts with different credentials at the same time.
 
 ## Samples
-Few sample below, also see help that comes with commands of the module.
+Few samples below, also see help that comes with commands of the module.
 
 ### Connection to DB
 ```powershell
@@ -91,7 +91,7 @@ $ctx = Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydom
 Get-CosmosDocument -Id '123' -PartitionKey 'sample-docs' -Collection 'docs' -Context $ctx
 ```
 ### Queries
-Query completely built in powershell code:
+Query string completely built in powershell code:
 ```powershell
 #invoke Cosmos query returning large resultset and measure total RU consumption
 $query = "select * from c where c.partitionKey = 'sample-docs'"
@@ -110,6 +110,7 @@ do
     throw $rslt.data
   }
 }while($null -ne $rslt.Continuation)
+```
 
 Parametrized query that pipes returned documents to be updated by bulk update:
 ```powershell
@@ -193,7 +194,7 @@ if(-not $rslt.IsSuccess)
 {
   if($rslt.HttpCode -eq [System.Net.HttpStatusCode]::PreconditionFailed)
   {
-    #document was not updated
+    #document was not updated because filter condition was not fulfilled
   }
   else
   {
