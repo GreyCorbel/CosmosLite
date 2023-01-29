@@ -6,7 +6,7 @@ on:
     paths-ignore:
       - '**'
     tags:
-      - 'cosmos-lite_v*'
+      - 'v*'
   workflow_dispatch:
 
 jobs:
