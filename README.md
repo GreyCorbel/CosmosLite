@@ -175,7 +175,7 @@ $rslt = Invoke-CosmosStoredProcedure -Name sp_MyProc -Parameters $params -Collec
 ```
 
 ### Partial document updates
-Unconditional update:
+Conditional update:
 ```powershell
 #Module supports Cosmos DB partial document updates
 #Updates are passed as document update object
