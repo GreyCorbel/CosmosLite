@@ -229,7 +229,7 @@ This command retrieves configuration for specified CosmosDB account and database
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
         }
 
-        $script:AuthFactories[$context.AccountName].AuthenticateAsync().GetAwaiter().GetResult()
+        Get-AadToken -Factory $script:AuthFactories[$context.AccountName]
     }
 }
 function Get-CosmosDocument
@@ -848,7 +848,7 @@ function Set-CosmosDocument
     Replaces document with new document
 
 .DESCRIPTION
-    replaces document data completely with new data. Document must exist for oepration to succeed.
+    Replaces document data completely with new data. Document must exist for oepration to succeed.
     
 .OUTPUTS
     Response describing result of operation
@@ -1080,7 +1080,6 @@ function Get-CosmosRequest
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
-        [switch]$Patch,
         [PSCustomObject]$Context = $script:Configuration
     )
 
@@ -1206,7 +1205,8 @@ function ProcessCosmosResponseInternal
         $val = $null
         #retrieve important headers
         if($rsp.Headers.TryGetValues('x-ms-request-charge', [ref]$val)) {
-            $retVal['Charge'] = [double]::Parse($val[0],$provider)
+            #we do not want fractions of RU - round to whole number
+            $retVal['Charge'] = [int][double]::Parse($val[0],$provider)
         }
         
         if($rsp.Headers.TryGetValues('x-ms-continuation', [ref]$val)) {
@@ -1236,7 +1236,10 @@ function ProcessCosmosResponseInternal
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
-        return [PSCustomObject]$retVal
+        #return typed object
+        $cosmosResponse = [PSCustomObject]$retVal
+        $cosmosResponse.psobject.typenames.Insert(0,'CosmosLite.Response') | Out-Null
+        $cosmosResponse
     }
 }
 function ProcessRequestBatchInternal
@@ -1287,8 +1290,8 @@ function ProcessRequestBatchInternal
                         #get waitTime
                         $val = $null
                         if($httpResponse.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) {$wait = [long]$val[0]} else {$wait=1000}
-                        #we wait for total time returned by all 429 responses
-                        $waitTime+= $wait
+                        #we wait for longest time returned by all 429 responses
+                        if($waitTime -lt $wait) {$waitTime = $wait}
                         $requestsToRetry+=$cosmosRequest
                     }
                     else {
