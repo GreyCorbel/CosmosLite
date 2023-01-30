@@ -20,7 +20,7 @@ Module offers the following features:
 - Calling of stored procedures
 
 All operations support retrying on throttling. For all operations, it's easy to know RU charge and detailed errors when they occur.  
-Commands support bulk mode when multiple frequests can be sent to CosmosDB at the same time
+Commands support bulk mode when multiple requests can be sent to CosmosDB at the same time.
 
 All operations return unified response object that contains below fields:
 - `IsSuccess`: Booleans success indicator
