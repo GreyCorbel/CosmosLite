@@ -8,7 +8,7 @@ This simple module is specialized on data manipulation in Cosmos DB. I originall
 
 So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authetication (no plans to add access key based auth)
 
-*Note*: CosmosLitee uses [AadAuthenticationFactory](https://github.com/GreyCorbel/AadAuthenticationFactory) module that implements various ways for authentication with Azure AD - form interactive login as user, over unattended authentication with Client ID and secret/certificate to AAD Managed Identity.
+*Note*: CosmosLite uses [AadAuthenticationFactory](https://github.com/GreyCorbel/AadAuthenticationFactory) module that implements various ways for authentication with Azure AD - form interactive login as user, over unattended authentication with Client ID and secret/certificate to AAD Managed Identity.
 
 I wish that Powershell would have built-in Public and Confidential client that would allow the same, so we would not have to pack dependencies and worry about MS modules version mismatches!
 
