@@ -35,7 +35,7 @@ This command replaces field 'content' and adds value to array field 'arrData' in
             # /path/path/fieldName format
         $TargetPath,
 
-        [Parameter(Mandatory)]
+        [Parameter()]
             #value to be used by operation
         $Value
     )
