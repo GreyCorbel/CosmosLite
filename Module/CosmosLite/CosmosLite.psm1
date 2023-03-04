@@ -398,7 +398,7 @@ This command performs cross partition parametrized query and iteratively fetches
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $uri = "$url"
         $rq.Uri = New-Object System.Uri($uri)
-        $rq.Payload = ($QueryDefinition | ConvertTo-Json)
+        $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
         $rq.ContentType = 'application/query+json'
 
         ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
