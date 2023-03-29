@@ -122,7 +122,12 @@ This command returns configuration object for working with CosmosDB account myCo
         [Parameter()]
         [string]
             #Name of the proxy if connection to Azure has to go via proxy server
-        $Proxy
+        $Proxy,
+        [Parameter()]
+        [int]
+            #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
+        $RetryCount = 10
+
     )
 
     process
@@ -138,7 +143,7 @@ This command returns configuration object for working with CosmosDB account myCo
         $script:Configuration = [PSCustomObject]@{
             AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
-            RetryCount = 10
+            RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
         }
