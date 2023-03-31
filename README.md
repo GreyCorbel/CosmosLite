@@ -66,7 +66,7 @@ $appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
 $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
 Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
 
-#connect Cosmos with System assigned Managed Identiy
+#connect Cosmos with System assigned Managed Identity or identity of Arc-enabled server
 Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -UseManagedIdentity
 
 #connect Cosmos with User assigned Managed Identity
