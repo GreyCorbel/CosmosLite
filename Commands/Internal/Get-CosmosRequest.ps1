@@ -4,7 +4,7 @@ function Get-CosmosRequest
         [Switch]$Upsert,
         [NUllable[UInt32]]$MaxItems,
         [string]$Continuation,
-        [string]$PartitionKey,
+        [string[]]$PartitionKey,
         [string]$Collection,
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
@@ -30,6 +30,7 @@ function Get-CosmosRequest
             ContentType = $null
             MaxRetries = $Context.RetryCount
             Collection=$Collection
+            ETag = $null
         }
     }
 }

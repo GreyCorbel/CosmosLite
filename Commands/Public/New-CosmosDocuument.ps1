@@ -31,7 +31,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key of new document
         $PartitionKey,
 
@@ -42,7 +42,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
 
@@ -54,16 +54,22 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [switch]
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
+
         [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
+        [string]
+            #ETag to check. Document is upserted only if server version of document has the same Etag
+        $Etag,
 
         [Parameter()]
         [int]
             #Degree of paralelism
-        $BatchSize = 1
+        $BatchSize = 1,
+
+        [Parameter()]
+        [PSCustomObject]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin
@@ -77,7 +83,10 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
         }
 
         $rq = Get-CosmosRequest `
@@ -90,7 +99,9 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $rq.Uri = new-object System.Uri($url)
         $rq.Payload = $Document
+        $rq.ETag = $ETag
         $rq.ContentType = 'application/json'
+
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
         if($outstandingRequests.Count -ge $batchSize)
         {

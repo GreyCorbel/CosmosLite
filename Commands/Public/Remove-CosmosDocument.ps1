@@ -26,7 +26,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $Id,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key value of the document
         $PartitionKey,
 
@@ -36,7 +36,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
 
@@ -68,7 +68,10 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
         }
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Delete

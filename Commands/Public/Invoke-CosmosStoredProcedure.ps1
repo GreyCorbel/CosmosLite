@@ -35,16 +35,16 @@ This command calls stored procedure and shows result.
             #When passing array of objects as single parameter, be sure that array is properly formatted so as it is a single parameter object rather than array of parameters
         $Parameters,
 
+        [Parameter()]
+        [string[]]
+            #Partition key identifying partition to operate upon.
+            #Stored procedures are currently required to operate upon single partition only
+        $PartitionKey,
+
         [Parameter(Mandatory)]
         [string]
             #Name of collection containing the stored procedure to call
         $Collection,
-
-        [Parameter()]
-        [string]
-            #Partition key identifying partition to operate upon.
-            #Stored procedures are currently required to operate upon single partition only
-        $PartitionKey,
 
         [Parameter()]
         [PSCustomObject]

@@ -35,7 +35,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key of document to be replaced
         $PartitionKey,
 
@@ -46,7 +46,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
         
@@ -54,6 +54,16 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         [string]
             #Name of collection containing the document
         $Collection,
+
+        [Parameter()]
+        [string]
+            #ETag to check. Document is updated only if server version of document has the same Etag
+        $Etag,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1,
 
         [Parameter()]
         [PSCustomObject]
@@ -74,7 +84,10 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         {
             #to change document Id, you cannot use DocumentObject parameter set
             $Id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
         }
 
@@ -82,6 +95,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $rq.Method = [System.Net.Http.HttpMethod]::Put
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
+        $rq.ETag = $ETag
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context

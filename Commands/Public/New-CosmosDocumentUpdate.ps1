@@ -44,7 +44,7 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         $Id,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key of new document
         $PartitionKey,
 
@@ -55,7 +55,7 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
 
@@ -70,7 +70,10 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
         }
 
         [PSCustomObject]@{

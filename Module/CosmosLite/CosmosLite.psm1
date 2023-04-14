@@ -123,7 +123,12 @@ This command returns configuration object for working with CosmosDB account myCo
         [Parameter()]
         [string]
             #Name of the proxy if connection to Azure has to go via proxy server
-        $Proxy
+        $Proxy,
+        [Parameter()]
+        [int]
+            #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
+        $RetryCount = 10
+
     )
 
     process
@@ -139,7 +144,7 @@ This command returns configuration object for working with CosmosDB account myCo
         $script:Configuration = [PSCustomObject]@{
             AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
-            RetryCount = 10
+            RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
         }
@@ -260,7 +265,7 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
         $Id,
 
         [Parameter(Mandatory)]
-        [string]
+        [string[]]
             #value of partition key for the document
         $PartitionKey,
 
@@ -268,6 +273,16 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
         [string]
             #Name of collection conaining the document
         $Collection,
+
+        [Parameter()]
+        [string]
+            #ETag to check. Document is retrieved only if server version of document has different Etag
+        $Etag,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1,
 
         [Parameter()]
         [PSCustomObject]
@@ -279,6 +294,7 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
+        $outstandingRequests=@()
     }
 
     process
@@ -286,7 +302,21 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Get
         $rq.Uri = new-object System.Uri("$url/$id")
-        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+        $rq.ETag = $ETag
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
     }
 }
 function Invoke-CosmosQuery
@@ -337,15 +367,15 @@ This command performs cross partition parametrized query and iteratively fetches
             #Parameter names must start with '@' char
         $QueryParameters,
 
+        [Parameter()]
+        [string[]]
+            #Partition key for partition where query operates. If not specified, query queries all partitions - it's cross-partition query (expensive)
+        $PartitionKey,
+
         [Parameter(Mandatory)]
         [string]
             #Name of the collection
         $Collection,
-
-        [Parameter()]
-        [string]
-            #Partition key for partition where query operates. If not specified, query queries all partitions - it's cross-partition query (expensive)
-        $PartitionKey,
 
         [Parameter()]
         [NUllable[UInt32]]
@@ -441,16 +471,16 @@ This command calls stored procedure and shows result.
             #When passing array of objects as single parameter, be sure that array is properly formatted so as it is a single parameter object rather than array of parameters
         $Parameters,
 
+        [Parameter()]
+        [string[]]
+            #Partition key identifying partition to operate upon.
+            #Stored procedures are currently required to operate upon single partition only
+        $PartitionKey,
+
         [Parameter(Mandatory)]
         [string]
             #Name of collection containing the stored procedure to call
         $Collection,
-
-        [Parameter()]
-        [string]
-            #Partition key identifying partition to operate upon.
-            #Stored procedures are currently required to operate upon single partition only
-        $PartitionKey,
 
         [Parameter()]
         [PSCustomObject]
@@ -545,7 +575,7 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         $Id,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key of new document
         $PartitionKey,
 
@@ -556,7 +586,7 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
 
@@ -571,7 +601,10 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
         }
 
         [PSCustomObject]@{
@@ -615,7 +648,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key of new document
         $PartitionKey,
 
@@ -626,7 +659,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
 
@@ -638,16 +671,22 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         [switch]
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
+
         [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
+        [string]
+            #ETag to check. Document is upserted only if server version of document has the same Etag
+        $Etag,
 
         [Parameter()]
         [int]
             #Degree of paralelism
-        $BatchSize = 1
+        $BatchSize = 1,
+
+        [Parameter()]
+        [PSCustomObject]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin
@@ -661,7 +700,10 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
         }
 
         $rq = Get-CosmosRequest `
@@ -674,7 +716,9 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $rq.Method = [System.Net.Http.HttpMethod]::Post
         $rq.Uri = new-object System.Uri($url)
         $rq.Payload = $Document
+        $rq.ETag = $ETag
         $rq.ContentType = 'application/json'
+
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
         if($outstandingRequests.Count -ge $batchSize)
         {
@@ -778,7 +822,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $Id,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key value of the document
         $PartitionKey,
 
@@ -788,7 +832,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
 
@@ -820,7 +864,10 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
         }
         $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Delete
@@ -878,7 +925,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
+        [string[]]
             #Partition key of document to be replaced
         $PartitionKey,
 
@@ -889,7 +936,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $DocumentObject,
 
         [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
+        [string[]]
             #attribute of DocumentObject used as partition key
         $PartitionKeyAttribute,
         
@@ -897,6 +944,16 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         [string]
             #Name of collection containing the document
         $Collection,
+
+        [Parameter()]
+        [string]
+            #ETag to check. Document is updated only if server version of document has the same Etag
+        $Etag,
+
+        [Parameter()]
+        [int]
+            #Degree of paralelism
+        $BatchSize = 1,
 
         [Parameter()]
         [PSCustomObject]
@@ -917,7 +974,10 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         {
             #to change document Id, you cannot use DocumentObject parameter set
             $Id = $DocumentObject.id
-            $PartitionKey = $DocumentObject."$PartitionKeyAttribute"
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
         }
 
@@ -925,6 +985,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $rq.Method = [System.Net.Http.HttpMethod]::Put
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
+        $rq.ETag = $ETag
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
@@ -1075,7 +1136,7 @@ function Get-CosmosRequest
         [Switch]$Upsert,
         [NUllable[UInt32]]$MaxItems,
         [string]$Continuation,
-        [string]$PartitionKey,
+        [string[]]$PartitionKey,
         [string]$Collection,
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
@@ -1101,6 +1162,7 @@ function Get-CosmosRequest
             ContentType = $null
             MaxRetries = $Context.RetryCount
             Collection=$Collection
+            ETag = $null
         }
     }
 }
@@ -1140,7 +1202,7 @@ function GetCosmosRequestInternal {
                     #Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
                     $retVal.Headers.Add('x-ms-max-item-count', $rq.MaxItems)
                 }
-                if([string]::IsNullOrEmpty($rq.PartitionKey))
+                if($rq.PartitionKey.Count -eq 0)
                 {
                     #Write-Verbose "Setting 'x-ms-documentdb-query-enablecrosspartition' to True"
                     $retVal.Headers.Add('x-ms-documentdb-query-enablecrosspartition', 'True')
@@ -1155,19 +1217,34 @@ function GetCosmosRequestInternal {
             {$_ -in 'SpCall','Document'} {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
+                if(-not [string]::IsNullOrEmpty($rq.ETag))
+                {
+                    #etag is expected to be double-quoted by http specs
+                    if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
+                    $retVal.Headers.IfMatch.Add($headerValue)
+                }
                 break
             }
-            default {}
+            default {
+                if(-not [string]::IsNullOrEmpty($rq.ETag))
+                {
+                    #etag is expected to be double-quoted by http specs
+                    if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
+                    $retVal.Headers.IfNoneMatch.Add($headerValue)
+                }
+                break;
+            }
         }
         if($rq.Upsert)
         {
             #Write-Verbose "Setting 'x-ms-documentdb-is-upsert' to True"
             $retVal.Headers.Add('x-ms-documentdb-is-upsert', 'True');
         }
-        if(-not [string]::IsNullOrEmpty($rq.PartitionKey))
+        if($rq.PartitionKey.Count -gt 0)
         {
-            #Write-Verbose "Setting 'x-ms-documentdb-partitionkey' to [`"$($rq.PartitionKey)`"]"
-            $retVal.Headers.Add('x-ms-documentdb-partitionkey', "[`"$($rq.PartitionKey)`"]")
+            $headerValue = $rq.PartitionKey | ConvertTo-Json
+            if($headerValue[0] -ne '[') {$headerValue = "[$headerValue]"}
+            $retVal.Headers.Add('x-ms-documentdb-partitionkey', $headerValue)
         }
 
         $retVal

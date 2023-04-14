@@ -34,7 +34,7 @@ function GetCosmosRequestInternal {
                     #Write-Verbose "Setting 'x-ms-max-item-count' to $($rq.MaxItems)"
                     $retVal.Headers.Add('x-ms-max-item-count', $rq.MaxItems)
                 }
-                if([string]::IsNullOrEmpty($rq.PartitionKey))
+                if($rq.PartitionKey.Count -eq 0)
                 {
                     #Write-Verbose "Setting 'x-ms-documentdb-query-enablecrosspartition' to True"
                     $retVal.Headers.Add('x-ms-documentdb-query-enablecrosspartition', 'True')
@@ -49,19 +49,34 @@ function GetCosmosRequestInternal {
             {$_ -in 'SpCall','Document'} {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
                 $retVal.Content.Headers.ContentType.CharSet=[string]::Empty
+                if(-not [string]::IsNullOrEmpty($rq.ETag))
+                {
+                    #etag is expected to be double-quoted by http specs
+                    if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
+                    $retVal.Headers.IfMatch.Add($headerValue)
+                }
                 break
             }
-            default {}
+            default {
+                if(-not [string]::IsNullOrEmpty($rq.ETag))
+                {
+                    #etag is expected to be double-quoted by http specs
+                    if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
+                    $retVal.Headers.IfNoneMatch.Add($headerValue)
+                }
+                break;
+            }
         }
         if($rq.Upsert)
         {
             #Write-Verbose "Setting 'x-ms-documentdb-is-upsert' to True"
             $retVal.Headers.Add('x-ms-documentdb-is-upsert', 'True');
         }
-        if(-not [string]::IsNullOrEmpty($rq.PartitionKey))
+        if($rq.PartitionKey.Count -gt 0)
         {
-            #Write-Verbose "Setting 'x-ms-documentdb-partitionkey' to [`"$($rq.PartitionKey)`"]"
-            $retVal.Headers.Add('x-ms-documentdb-partitionkey', "[`"$($rq.PartitionKey)`"]")
+            $headerValue = $rq.PartitionKey | ConvertTo-Json
+            if($headerValue[0] -ne '[') {$headerValue = "[$headerValue]"}
+            $retVal.Headers.Add('x-ms-documentdb-partitionkey', $headerValue)
         }
 
         $retVal

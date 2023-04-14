@@ -46,15 +46,15 @@ This command performs cross partition parametrized query and iteratively fetches
             #Parameter names must start with '@' char
         $QueryParameters,
 
+        [Parameter()]
+        [string[]]
+            #Partition key for partition where query operates. If not specified, query queries all partitions - it's cross-partition query (expensive)
+        $PartitionKey,
+
         [Parameter(Mandatory)]
         [string]
             #Name of the collection
         $Collection,
-
-        [Parameter()]
-        [string]
-            #Partition key for partition where query operates. If not specified, query queries all partitions - it's cross-partition query (expensive)
-        $PartitionKey,
 
         [Parameter()]
         [NUllable[UInt32]]
