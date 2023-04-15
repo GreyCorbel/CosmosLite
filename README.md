@@ -50,7 +50,7 @@ We have simple testing document in Cosmos DB container:
 ```
 We will update the `val` attribute via partial document update 500 times by test script with various batch sizes to see overall performace of test.
 ```powershell
-#Create a scriptblock that will feed the Update-CosmosDocument command
+# Create a scriptblock that will feed the Update-CosmosDocument command
 $scriptBlock = {
   param(
     [Parameter(Mandatory,ValueFromPipeline)][int]$i
@@ -62,14 +62,15 @@ $scriptBlock = {
   }
 }
 
-#do the test by updating test document 500 times
 $batchSizes = 1,5,10,20,50
-#perform the test for all batch sizes
+# Perform the test for all batch sizes
 foreach($batchSize in $batchSizes)
 {
   $start=(get-date)
+  # update doc 500 times
   1..500 | &$scriptBlock | Update-CosmosDocument -Collection requests -BatchSize $batchSize | Out-Null
   $duration = (get-date)-$start
+  # show duration
   [PSCustomObject]@{BatchSize = $batchSize; Duration = [int]$duration.TotalMilliseconds}
 }
 ```
