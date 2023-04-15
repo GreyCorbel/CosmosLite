@@ -1,4 +1,6 @@
-# CosmosLite
+# CosmosLite PowerShell module
+
+## Overview
 This simple module is specialized on data manipulation in Cosmos DB. I originally used [PlagueHO/CosmosDB](https://github.com/PlagueHO/CosmosDB) module, however found it too difficult, because:
 - it contains much more functionality than actually needed for data manipulation
 - dev updates are slow
@@ -34,22 +36,70 @@ All operations return unified response object that contains below fields:
 
 Optionally, response object may also contain Headers field - complete set of headers as returned by server. This functionality is turned on via `CollectResponseHeader` switch of `Connect-Cosmos` command and may be usable for troubleshooting.
 
+## Bulk processing support and performance
+Bulk processing is supported for most commands implemented by modul via `BatchSize` parameter. By default, `BatchSize` has value 1, which means that bulk processing is turned off. This means that when running as part of pipeline, command waits until response is returned from Cosmos DB before sending another request. By increasing `BatchSize` parameter, command does not wait for Cosmos DB  response and sends another request immediately. Command sends up to `BatchSize` requests without waiting, and only after then in checks response for all outstaning requests. This can significantly increase performance for workloads where performance is critical.
+
+Let's demostrate it on simple test code that uses `Update-CosmosDocument` command.
+We have simple testing document in Cosmos DB container:
+```json
+{
+  "id": "1",
+  "val": 0,
+  "partitionKey": "test",
+}
+```
+We will update the `val` attribute via partial document update 500 times by test script with various batch sizes to see overall performace of test.
+```powershell
+#Create a scriptblock that will feed the Update-CosmosDocument command
+$scriptBlock = {
+  param(
+    [Parameter(Mandatory,ValueFromPipeline)][int]$i
+  )
+  process{
+    $update = New-CosmosDocumentUpdate -Id 1 -PartitionKey test
+    $update.updates+=New-CosmosUpdateOperation -Operation Increment -TargetPath '/val' -Value $i
+    $update
+  }
+}
+
+#do the test by updating test document 500 times
+$batchSizes = 1,5,10,20,50
+#perform the test for all batch sizes
+foreach($batchSize in $batchSizes)
+{
+  $start=(get-date)
+  1..500 | &$scriptBlock | Update-CosmosDocument -Collection requests -BatchSize $batchSize | Out-Null
+  $duration = (get-date)-$start
+  [PSCustomObject]@{BatchSize = $batchSize; Duration = [int]$duration.TotalMilliseconds}
+}
+```
+Output shows significant performance gain for batch sizes > 1:
+
+|BatchSize |Duration [ms]|
+|--------- |--------
+|       1  | 40473 
+|       5  | 16884 
+|      10  | 11296
+|      20  | 10265
+|      50  | 8164
+
 ## Authentication
-Module supports OAuth/OpenId Connect authentication with AAD in Delegated and Application contexts.
+Module supports OAuth/OpenId Connect authentication with Azure AD in Delegated and Application contexts.
 
 No other authentication mechanisms are currently supported - I don't plan to implement them here and want to focus on RBAC and OAuth only. Target audience is both ad-hoc interactive scripting (with Delegated authentication) and backend processes with explicit app identity (authentication with ClientSecret or X.509 certificate) or implicit identity (authenticated with Azure Managed Identity)
 
 Authentication is implemented by utility module [AadAuthenticationFactory](https://github.com/GreyCorbel/AadAuthenticationFactory) this module depends on.
 
-For Public client flow, authentication uses well-known ClientId for Azure Powershell by defsault, or you can use your app registered with your tenant, if you wish.
+For Public client flow, authentication uses well-known ClientId for Azure Powershell by default, or you can use your app registered with your tenant, if you wish.
 
 For Confidential client flow, use own ClientId with Client Secret or Certificate.
 
-For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function - all cases with System Managed Identity and User-assigned Managed Identity.
+For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function / Azure Automation - all cases with System Managed Identity and User-assigned Managed Identity.  
+Arc-enabled server running out of Azure are also supported.
 
 Supported authentication flows for Public client are `Interactive` (via web view/browser) or `DeviceCode` (with code displayed on command line and authentication handled by user in independent browser session)
 
-Authentication allows separate credentials for every Cosmos DB account, so in single script / powershell session, you can connect to multiple Cosmos DB accounts with different credentials at the same time.
+Authentication allows separate credentials for every Cosmos DB account, so in single script / powershell session, you can connect to multiple Cosmos DB accounts and databases with different credentials at the same time - just store connection returned by `Connect-Cosmos` command in variable and use it as needed.
 
 ## Samples
 Few samples below, also see help that comes with commands of the module.
