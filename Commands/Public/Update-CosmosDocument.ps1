@@ -6,25 +6,26 @@ function Update-CosmosDocument
 
 .DESCRIPTION
     Updates document data according to update operations provided.
-    This command uses Cosmos DB Partial document update API to perform changes on server side without the need to download the document to client, modify it on client and upload back to server
+    This command uses Cosmos DB Partial document update API to perform changes on server side without the need to download the document to client, modify it on client side and upload back to server
+    Command supports parallel processing.
 
 .OUTPUTS
     Response describing result of operation
 
 .EXAMPLE
     $DocUpdate = New-CosmosDocumentUpdate -Id '123' -PartitionKey 'test-docs'
-    $DocUpdate.Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
+    $DocUpdate.Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for property content'
     Update-CosmosDocument -UpdateObject $DocUpdate -Collection 'docs'
 
-Description
------------
-This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
+    Description
+    -----------
+    This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
 #>
 
     [CmdletBinding()]
     param (
         [Parameter(Mandatory, ValueFromPipeline)]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Update')]
             #Object representing document update specification produced by New-CosmosDocumentUpdate
             #and containing collection od up to 10 updates produced by New-CosmosUpdateOperation
         $UpdateObject,
@@ -33,17 +34,17 @@ This command replaces field 'content' in root of the document with ID '123' and 
         [string]
             #Name of the collection containing updated document
         $Collection,
-        
-        [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
 
         [Parameter()]
         [int]
-            #Degree of paralelism
-        $BatchSize = 1
+            #Degree of paralelism for pipeline processing
+        $BatchSize = 1,
+        
+        [Parameter()]
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin

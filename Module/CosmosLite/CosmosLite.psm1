@@ -12,40 +12,41 @@ function Connect-Cosmos
     Authentication uses by default well-know clientId of Azure Powershell, but can accept clientId of app registered in your own tenant. In this case, application shall have configured API permission to allow delegated access to CosmosDB resource (https://cosmos.azure.com/user_impersonation), or - for Confidential client - RBAC role on CosmosDB account
 
 .OUTPUTS
-    Connection configuration object
+    Connection configuration object.
+
+.NOTES
+    Most recently created configuration object is also cached inside the module and is automatically used when not provided to other commands
 
 .EXAMPLE
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com -AuthMode Interactive
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
 
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Delegated auth flow
-
-.EXAMPLE
-$thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
-$appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
-$cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
-
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mycompany.com, with Application auth flow
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mydomain.com, with Delegated auth flow
 
 .EXAMPLE
+    $thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
+    $appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
+    $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
 
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -UseManagedIdentity
-
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount, with authentication by System-assigned Managed Identity
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mycompany.com, with Application auth flow
 
 .EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity
 
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by System-assigned Managed Identity
 
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount, with authentication by User-assigned Managed Identity
+.EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by User-assigned Managed Identity
 #>
 
     param
@@ -91,7 +92,7 @@ This command returns configuration object for working with CosmosDB account myCo
         [pscredential]
             #Resource Owner username and password
             #Used to get access as user
-            #Note: Does not work for federated authentication
+            #Note: Does not work for federated authentication - see https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc
         $ResourceOwnerCredential,
 
         [Parameter()]
@@ -108,7 +109,7 @@ This command returns configuration object for working with CosmosDB account myCo
         
         [Parameter(ParameterSetName = 'PublicClient')]
         [string]
-            #How to authenticate user - via web view or via device code flow
+            #Username hint for interactive authentication flows
         $UserNameHint,
 
         [Parameter(ParameterSetName = 'MSI')]
@@ -128,7 +129,6 @@ This command returns configuration object for working with CosmosDB account myCo
         [int]
             #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
         $RetryCount = 10
-
     )
 
     process
@@ -142,6 +142,7 @@ This command returns configuration object for working with CosmosDB account myCo
 
         $script:httpClient = new-object System.Net.Http.HttpClient
         $script:Configuration = [PSCustomObject]@{
+            PSTypeName = "CosmosLite.Connection"
             AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
             RetryCount = $RetryCount
@@ -184,11 +185,10 @@ This command returns configuration object for working with CosmosDB account myCo
                         break;
                     }
                 }
-                $script:Configuration.psobject.typenames.Insert(0,'CosmosLite.Connection.Configuration')
                 $script:Configuration
         }
         catch {
-            throw $_.Exception
+            throw
         }
     }
 }
@@ -203,21 +203,23 @@ function Get-CosmosAccessToken
     Can be used for debug purposes; module itself gets token as needed, including refreshing the tokens when they expire
 
 .OUTPUTS
-    OpentID token as returned by AAD.
+    AuthenticationResult returned by AAD that contains access token and other information about logged-in identity.
+
+.NOTES
+    See https://learn.microsoft.com/en-us/dotnet/api/microsoft.identity.client.authenticationresult
 
 .EXAMPLE
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com | Get-CosmosAccessToken
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com | Get-CosmosAccessToken
 
-Description
------------
-This command retrieves configuration for specified CosmosDB account and database, and retrieves access token for it using well-known clientId of Azure PowerShell
-
+    Description
+    -----------
+    This command retrieves configuration for specified CosmosDB account and database, and retrieves access token for it using well-known clientId of Azure PowerShell
 #>
 
     param
     (
         [Parameter(ValueFromPipeline)]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
         $context = $script:Configuration
     )
@@ -245,17 +247,18 @@ function Get-CosmosDocument
 
 .DESCRIPTION
     Retrieves document from the collection by id and partition key
+    Command supports parallel processing.
 
 .OUTPUTS
     Response containing retrieved document parsed from JSON format.
 
 .EXAMPLE
-$rsp = Get-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
-$rsp.data
+    $rsp = Get-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
+    $rsp.data
 
-Description
------------
-This command retrieves document with id = '123' and partition key 'test-docs' from collection 'docs'
+    Description
+    -----------
+    This command retrieves document with id = '123' and partition key 'test-docs' from collection 'docs'
 #>
     param
     (
@@ -276,16 +279,16 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
 
         [Parameter()]
         [string]
-            #ETag to check. Document is retrieved only if server version of document has different Etag
+            #ETag to check. Document is retrieved only if server version of document has different ETag
         $Etag,
 
         [Parameter()]
         [int]
-            #Degree of paralelism
+            #Degree of paralelism for pipeline processing
         $BatchSize = 1,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration
@@ -341,17 +344,18 @@ function Invoke-CosmosQuery
     $data = @()
     do
     {
-        $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' -ContinuationToken $rsp.Continuation
+        $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' -ContinuationToken $rsp.Continuation
         if($rsp.IsSuccess)
         {
             $data += $rsp.data.Documents
         }
         $totalRuConsumption+=$rsp.Charge
     }while($null -ne $rsp.Continuation)
+    "Total RU consumption: $totalRuConsumption"
 
-Description
------------
-This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+    Description
+    -----------
+    This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
 #>
 
     [CmdletBinding()]
@@ -389,7 +393,7 @@ This command performs cross partition parametrized query and iteratively fetches
         $ContinuationToken,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration
@@ -442,6 +446,7 @@ function Invoke-CosmosStoredProcedure
 
 .DESCRIPTION
     Calls stored procedure.
+    Command supports parallel processing.
     Note: Stored procedures that return large dataset also support continuation token, however, continuation token must be passed as parameter, corretly passed to query inside store procedure logivc, and returned as part of stored procedure response.
       This means that stored procedure logic is fully responsible for handling paging via continuation tokens. 
       For details, see Cosmos DB server side programming reference
@@ -451,12 +456,12 @@ function Invoke-CosmosStoredProcedure
 
 .EXAMPLE
     $params = @('123', 'test')
-        $rsp = Invoke-CosmosStoredProcedure -Name testSP -Parameters ($params | ConvertTo-Json) -Collection 'docs' -PartitionKey 'test-docs'
-        $rsp
+    $rsp = Invoke-CosmosStoredProcedure -Name testSP -Parameters ($params | ConvertTo-Json) -Collection 'docs' -PartitionKey 'test-docs'
+    $rsp
 
-Description
------------
-This command calls stored procedure and shows result.
+    Description
+    -----------
+    This command calls stored procedure and shows result.
 #>
     [CmdletBinding()]
     param (
@@ -483,15 +488,15 @@ This command calls stored procedure and shows result.
         $Collection,
 
         [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
+        [int]
+            #Degree of paralelism for pipelinr processing
+        $BatchSize = 1,
 
         [Parameter()]
-        [int]
-            #Degree of paralelism
-        $BatchSize = 1
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin
@@ -537,34 +542,34 @@ function New-CosmosDocumentUpdate
 
 .DESCRIPTION
     Constructs document update description. Used together with Update-CosmosDocument and New-CosmoUpdateOperation commands.
-    
+
 .OUTPUTS
     Document update specification
 
 .EXAMPLE
-    $query = 'select * from c where c.quantity < @threshold'
+    $query = 'select c.id,c.pk from c where c.quantity < @threshold'
     $queryParams = @{
         '@threshold' = 10
     }
     $cntinuation = $null
     do
     {
-        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
+        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' ContinuationToken $continuation
         if(!$rslt.IsSuccess)
         {
             throw $rslt.Data
         }
         $rslt.Data.Documents | Foreach-Object {
-            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute
+            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute pk
             $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
-        } | Update-CosmosDocument -Collection 'test-docs' -BatchSize 4
+        } | Update-CosmosDocument -Collection 'docs' -BatchSize 4
         $continuation = $rslt.Continuation
     }while($null -ne $continuation)
 
-Description
------------
-This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
-Update is performed in parallel; up to 4 updates are performed at the same time
+    Description
+    -----------
+    This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
+    Update is performed in parallel; up to 4 updates are performed at the same time
 #>
 
     [CmdletBinding()]
@@ -608,6 +613,7 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         }
 
         [PSCustomObject]@{
+            PSTypeName = "CosmosLite.Update"
             Id = $Id
             PartitionKey = $PartitionKey
             Condition = $Condition
@@ -623,6 +629,7 @@ function New-CosmosDocument
 
 .DESCRIPTION
     Inserts new document into collection, or replaces existing when asked to perform upsert.
+    Command supports parallel processing.
 
 .OUTPUTS
     Response describing result of operation
@@ -635,9 +642,9 @@ function New-CosmosDocument
     }
     New-CosmosDocument -Document ($doc | ConvertTo-Json) -PartitionKey 'test-docs' -Collection 'docs' -IsUpsert
 
-Description
------------
-This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Description
+    -----------
+    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
 #>
 
     [CmdletBinding()]
@@ -668,14 +675,14 @@ This command creates new document with id = '123' and partition key 'test-docs' 
             #Name of the collection where to store document in
         $Collection,
 
-        [switch]
-            #Whether to replace existing document with same Id and Partition key
-        $IsUpsert,
-
         [Parameter()]
         [string]
             #ETag to check. Document is upserted only if server version of document has the same Etag
         $Etag,
+
+        [switch]
+            #Whether to replace existing document with same Id and Partition key
+        $IsUpsert,
 
         [Parameter()]
         [int]
@@ -683,7 +690,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $BatchSize = 1,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration
@@ -752,9 +759,9 @@ function New-CosmosUpdateOperation
     $Updates += New-CosmosUpdateOperation -Operation Add -TargetPath '/arrData/-' -value 'New value to be appended to the end of array'
     Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates
 
-Description
------------
-This command replaces field 'content' and adds value to array field 'arrData' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs'
+    Description
+    -----------
+    This command replaces field 'content' and adds value to array field 'arrData' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs'
 #>
 
     [CmdletBinding()]
@@ -788,6 +795,7 @@ This command replaces field 'content' and adds value to array field 'arrData' in
     process
     {
         [PSCustomObject]@{
+            PSTypeName = 'CosmosLite.UpdateOperation'
             op = $ops[$Operation]
             path = $TargetPath
             value = $Value
@@ -801,7 +809,8 @@ function Remove-CosmosDocument
     Removes document from collection
 
 .DESCRIPTION
-    Removes document from collection
+    Removes document from collection.
+    Command supports parallel processing.
 
 .OUTPUTS
     Response describing result of operation
@@ -809,9 +818,9 @@ function Remove-CosmosDocument
 .EXAMPLE
     Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
-Description
------------
-This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Description
+    -----------
+    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
 #>
 
     [CmdletBinding()]
@@ -842,15 +851,15 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $Collection,
 
         [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
+        [int]
+            #Degree of paralelism for pipeline processing
+        $BatchSize = 1,
 
         [Parameter()]
-        [int]
-            #Degree of paralelism
-        $BatchSize = 1
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin
@@ -896,6 +905,8 @@ function Set-CosmosDocument
 
 .DESCRIPTION
     Replaces document data completely with new data. Document must exist for oepration to succeed.
+    When ETag parameter is specified, document is updated only if etag on server version of document is different.
+    Command supports parallel processing.
     
 .OUTPUTS
     Response describing result of operation
@@ -908,9 +919,9 @@ function Set-CosmosDocument
     }
     Set-CosmosDocument -Id '123' Document ($doc | ConvertTo-Json) -PartitionKey 'test-docs' -Collection 'docs'
 
-Description
------------
-This command replaces entire document with ID '123' and partition key 'test-docs' in collection 'docs' with new content
+    Description
+    -----------
+    This command replaces entire document with ID '123' and partition key 'test-docs' in collection 'docs' with new content
 #>
     [CmdletBinding()]
     param (
@@ -956,7 +967,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $BatchSize = 1,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration
@@ -1019,20 +1030,20 @@ function Set-CosmosRetryCount
 .EXAMPLE
     Set-CosmosRetryCount -RetryCount 20
 
-Description
------------
-This command sets maximus retries for throttled requests to 20
+    Description
+    -----------
+    This command sets maximus retries for throttled requests to 20
 #>
 
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory, Position = 1)]
+        [Parameter(Mandatory)]
         [int]
             #Number of retries
         $RetryCount,
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration
@@ -1051,25 +1062,26 @@ function Update-CosmosDocument
 
 .DESCRIPTION
     Updates document data according to update operations provided.
-    This command uses Cosmos DB Partial document update API to perform changes on server side without the need to download the document to client, modify it on client and upload back to server
+    This command uses Cosmos DB Partial document update API to perform changes on server side without the need to download the document to client, modify it on client side and upload back to server
+    Command supports parallel processing.
 
 .OUTPUTS
     Response describing result of operation
 
 .EXAMPLE
     $DocUpdate = New-CosmosDocumentUpdate -Id '123' -PartitionKey 'test-docs'
-    $DocUpdate.Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for propery content'
+    $DocUpdate.Updates += New-CosmosUpdateOperation -Operation Set -TargetPath '/content' -value 'This is new data for property content'
     Update-CosmosDocument -UpdateObject $DocUpdate -Collection 'docs'
 
-Description
------------
-This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
+    Description
+    -----------
+    This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
 #>
 
     [CmdletBinding()]
     param (
         [Parameter(Mandatory, ValueFromPipeline)]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Update')]
             #Object representing document update specification produced by New-CosmosDocumentUpdate
             #and containing collection od up to 10 updates produced by New-CosmosUpdateOperation
         $UpdateObject,
@@ -1078,17 +1090,17 @@ This command replaces field 'content' in root of the document with ID '123' and 
         [string]
             #Name of the collection containing updated document
         $Collection,
-        
-        [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
 
         [Parameter()]
         [int]
-            #Degree of paralelism
-        $BatchSize = 1
+            #Degree of paralelism for pipeline processing
+        $BatchSize = 1,
+        
+        [Parameter()]
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin
@@ -1134,14 +1146,19 @@ function Get-CosmosRequest
 {
     param(
         [Switch]$Upsert,
+        [Parameter()]
         [NUllable[UInt32]]$MaxItems,
+        [Parameter()]
         [string]$Continuation,
+        [Parameter()]
         [string[]]$PartitionKey,
+        [Parameter(Mandatory)]
         [string]$Collection,
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
-        [PSCustomObject]$Context = $script:Configuration
+        [Parameter()]
+        [PSTypeName('CosmosLite.Connection')]$Context = $script:Configuration
     )
 
     process
@@ -1258,9 +1275,9 @@ function ProcessCosmosResponseInternal
         [System.Net.Http.HttpResponseMessage]
         $rsp,
         [Parameter(Mandatory)]
-        $Context,
+        [PSTypeName('CosmosLite.Connection')]$Context,
         [Parameter(Mandatory)]
-        $Collection
+        [string]$Collection
     )
 
     begin
@@ -1270,6 +1287,7 @@ function ProcessCosmosResponseInternal
     process
     {
         $retVal=[ordered]@{
+            PSTypeName = "CosmosLite.Response"
             IsSuccess = $false
             HttpCode = 0
             Charge = -1
@@ -1313,10 +1331,7 @@ function ProcessCosmosResponseInternal
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
-        #return typed object
-        $cosmosResponse = [PSCustomObject]$retVal
-        $cosmosResponse.psobject.typenames.Insert(0,'CosmosLite.Response') | Out-Null
-        $cosmosResponse
+        [PSCustomObject]$retVal
     }
 }
 function ProcessRequestBatchInternal
@@ -1326,7 +1341,7 @@ function ProcessRequestBatchInternal
         [Parameter(Mandatory)]
         [PSCustomObject[]]$Batch,
         [Parameter(Mandatory)]
-        $Context
+        [PSTypeName('CosmosLite.Connection')]$Context
     )
 
     begin
@@ -1406,7 +1421,7 @@ function SendRequestInternal
         [Parameter(Mandatory)]
         [PSCustomObject]$rq,
         [Parameter(Mandatory)]
-        $Context
+        [PSTypeName('CosmosLite.Connection')]$Context
     )
 
     process

@@ -5,7 +5,8 @@ function Remove-CosmosDocument
     Removes document from collection
 
 .DESCRIPTION
-    Removes document from collection
+    Removes document from collection.
+    Command supports parallel processing.
 
 .OUTPUTS
     Response describing result of operation
@@ -13,9 +14,9 @@ function Remove-CosmosDocument
 .EXAMPLE
     Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
-Description
------------
-This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Description
+    -----------
+    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
 #>
 
     [CmdletBinding()]
@@ -46,15 +47,15 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $Collection,
 
         [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
+        [int]
+            #Degree of paralelism for pipeline processing
+        $BatchSize = 1,
 
         [Parameter()]
-        [int]
-            #Degree of paralelism
-        $BatchSize = 1
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin

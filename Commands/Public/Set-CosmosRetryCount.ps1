@@ -14,20 +14,20 @@ function Set-CosmosRetryCount
 .EXAMPLE
     Set-CosmosRetryCount -RetryCount 20
 
-Description
------------
-This command sets maximus retries for throttled requests to 20
+    Description
+    -----------
+    This command sets maximus retries for throttled requests to 20
 #>
 
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory, Position = 1)]
+        [Parameter(Mandatory)]
         [int]
             #Number of retries
         $RetryCount,
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration

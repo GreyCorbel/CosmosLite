@@ -4,7 +4,7 @@
         <View>
         <Name>CosmosLiteConnectionConfig</Name>
         <ViewSelectedBy>
-            <TypeName>CosmosLite.Connection.Configuration</TypeName>
+            <TypeName>CosmosLite.Connection</TypeName>
         </ViewSelectedBy>
         <TableControl>
             <TableRowEntries>

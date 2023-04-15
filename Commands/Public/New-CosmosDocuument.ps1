@@ -6,6 +6,7 @@ function New-CosmosDocument
 
 .DESCRIPTION
     Inserts new document into collection, or replaces existing when asked to perform upsert.
+    Command supports parallel processing.
 
 .OUTPUTS
     Response describing result of operation
@@ -18,9 +19,9 @@ function New-CosmosDocument
     }
     New-CosmosDocument -Document ($doc | ConvertTo-Json) -PartitionKey 'test-docs' -Collection 'docs' -IsUpsert
 
-Description
------------
-This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Description
+    -----------
+    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
 #>
 
     [CmdletBinding()]
@@ -51,14 +52,14 @@ This command creates new document with id = '123' and partition key 'test-docs' 
             #Name of the collection where to store document in
         $Collection,
 
-        [switch]
-            #Whether to replace existing document with same Id and Partition key
-        $IsUpsert,
-
         [Parameter()]
         [string]
             #ETag to check. Document is upserted only if server version of document has the same Etag
         $Etag,
+
+        [switch]
+            #Whether to replace existing document with same Id and Partition key
+        $IsUpsert,
 
         [Parameter()]
         [int]
@@ -66,7 +67,7 @@ This command creates new document with id = '123' and partition key 'test-docs' 
         $BatchSize = 1,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration

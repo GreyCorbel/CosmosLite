@@ -20,17 +20,18 @@ function Invoke-CosmosQuery
     $data = @()
     do
     {
-        $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' -ContinuationToken $rsp.Continuation
+        $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' -ContinuationToken $rsp.Continuation
         if($rsp.IsSuccess)
         {
             $data += $rsp.data.Documents
         }
         $totalRuConsumption+=$rsp.Charge
     }while($null -ne $rsp.Continuation)
+    "Total RU consumption: $totalRuConsumption"
 
-Description
------------
-This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+    Description
+    -----------
+    This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
 #>
 
     [CmdletBinding()]
@@ -68,7 +69,7 @@ This command performs cross partition parametrized query and iteratively fetches
         $ContinuationToken,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration

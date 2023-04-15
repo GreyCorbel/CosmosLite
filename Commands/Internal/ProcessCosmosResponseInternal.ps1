@@ -6,9 +6,9 @@ function ProcessCosmosResponseInternal
         [System.Net.Http.HttpResponseMessage]
         $rsp,
         [Parameter(Mandatory)]
-        $Context,
+        [PSTypeName('CosmosLite.Connection')]$Context,
         [Parameter(Mandatory)]
-        $Collection
+        [string]$Collection
     )
 
     begin
@@ -18,6 +18,7 @@ function ProcessCosmosResponseInternal
     process
     {
         $retVal=[ordered]@{
+            PSTypeName = "CosmosLite.Response"
             IsSuccess = $false
             HttpCode = 0
             Charge = -1
@@ -61,9 +62,6 @@ function ProcessCosmosResponseInternal
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
-        #return typed object
-        $cosmosResponse = [PSCustomObject]$retVal
-        $cosmosResponse.psobject.typenames.Insert(0,'CosmosLite.Response') | Out-Null
-        $cosmosResponse
+        [PSCustomObject]$retVal
     }
 }

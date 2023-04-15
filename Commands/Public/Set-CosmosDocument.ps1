@@ -6,6 +6,8 @@ function Set-CosmosDocument
 
 .DESCRIPTION
     Replaces document data completely with new data. Document must exist for oepration to succeed.
+    When ETag parameter is specified, document is updated only if etag on server version of document is different.
+    Command supports parallel processing.
     
 .OUTPUTS
     Response describing result of operation
@@ -18,9 +20,9 @@ function Set-CosmosDocument
     }
     Set-CosmosDocument -Id '123' Document ($doc | ConvertTo-Json) -PartitionKey 'test-docs' -Collection 'docs'
 
-Description
------------
-This command replaces entire document with ID '123' and partition key 'test-docs' in collection 'docs' with new content
+    Description
+    -----------
+    This command replaces entire document with ID '123' and partition key 'test-docs' in collection 'docs' with new content
 #>
     [CmdletBinding()]
     param (
@@ -66,7 +68,7 @@ This command replaces entire document with ID '123' and partition key 'test-docs
         $BatchSize = 1,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration

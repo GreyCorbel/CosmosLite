@@ -5,7 +5,7 @@ function SendRequestInternal
         [Parameter(Mandatory)]
         [PSCustomObject]$rq,
         [Parameter(Mandatory)]
-        $Context
+        [PSTypeName('CosmosLite.Connection')]$Context
     )
 
     process

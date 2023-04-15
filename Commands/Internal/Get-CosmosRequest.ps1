@@ -2,14 +2,19 @@ function Get-CosmosRequest
 {
     param(
         [Switch]$Upsert,
+        [Parameter()]
         [NUllable[UInt32]]$MaxItems,
+        [Parameter()]
         [string]$Continuation,
+        [Parameter()]
         [string[]]$PartitionKey,
+        [Parameter(Mandatory)]
         [string]$Collection,
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
-        [PSCustomObject]$Context = $script:Configuration
+        [Parameter()]
+        [PSTypeName('CosmosLite.Connection')]$Context = $script:Configuration
     )
 
     process

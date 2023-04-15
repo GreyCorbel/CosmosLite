@@ -6,34 +6,34 @@ function New-CosmosDocumentUpdate
 
 .DESCRIPTION
     Constructs document update description. Used together with Update-CosmosDocument and New-CosmoUpdateOperation commands.
-    
+
 .OUTPUTS
     Document update specification
 
 .EXAMPLE
-    $query = 'select * from c where c.quantity < @threshold'
+    $query = 'select c.id,c.pk from c where c.quantity < @threshold'
     $queryParams = @{
         '@threshold' = 10
     }
     $cntinuation = $null
     do
     {
-        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'test-docs' ContinuationToken $continuation
+        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' ContinuationToken $continuation
         if(!$rslt.IsSuccess)
         {
             throw $rslt.Data
         }
         $rslt.Data.Documents | Foreach-Object {
-            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute
+            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute pk
             $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
-        } | Update-CosmosDocument -Collection 'test-docs' -BatchSize 4
+        } | Update-CosmosDocument -Collection 'docs' -BatchSize 4
         $continuation = $rslt.Continuation
     }while($null -ne $continuation)
 
-Description
------------
-This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
-Update is performed in parallel; up to 4 updates are performed at the same time
+    Description
+    -----------
+    This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
+    Update is performed in parallel; up to 4 updates are performed at the same time
 #>
 
     [CmdletBinding()]
@@ -77,6 +77,7 @@ Update is performed in parallel; up to 4 updates are performed at the same time
         }
 
         [PSCustomObject]@{
+            PSTypeName = "CosmosLite.Update"
             Id = $Id
             PartitionKey = $PartitionKey
             Condition = $Condition

@@ -11,40 +11,41 @@ function Connect-Cosmos
     Authentication uses by default well-know clientId of Azure Powershell, but can accept clientId of app registered in your own tenant. In this case, application shall have configured API permission to allow delegated access to CosmosDB resource (https://cosmos.azure.com/user_impersonation), or - for Confidential client - RBAC role on CosmosDB account
 
 .OUTPUTS
-    Connection configuration object
+    Connection configuration object.
+
+.NOTES
+    Most recently created configuration object is also cached inside the module and is automatically used when not provided to other commands
 
 .EXAMPLE
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com -AuthMode Interactive
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
 
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mydomain.com, with Delegated auth flow
-
-.EXAMPLE
-$thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
-$appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
-$cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
-
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount in tenant mycompany.com, with Application auth flow
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mydomain.com, with Delegated auth flow
 
 .EXAMPLE
+    $thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
+    $appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
+    $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
 
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -UseManagedIdentity
-
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount, with authentication by System-assigned Managed Identity
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mycompany.com, with Application auth flow
 
 .EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity
 
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by System-assigned Managed Identity
 
-Description
------------
-This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myDbInCosmosAccount, with authentication by User-assigned Managed Identity
+.EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
+
+    Description
+    -----------
+    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by User-assigned Managed Identity
 #>
 
     param
@@ -90,7 +91,7 @@ This command returns configuration object for working with CosmosDB account myCo
         [pscredential]
             #Resource Owner username and password
             #Used to get access as user
-            #Note: Does not work for federated authentication
+            #Note: Does not work for federated authentication - see https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc
         $ResourceOwnerCredential,
 
         [Parameter()]
@@ -107,7 +108,7 @@ This command returns configuration object for working with CosmosDB account myCo
         
         [Parameter(ParameterSetName = 'PublicClient')]
         [string]
-            #How to authenticate user - via web view or via device code flow
+            #Username hint for interactive authentication flows
         $UserNameHint,
 
         [Parameter(ParameterSetName = 'MSI')]
@@ -127,7 +128,6 @@ This command returns configuration object for working with CosmosDB account myCo
         [int]
             #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
         $RetryCount = 10
-
     )
 
     process
@@ -141,6 +141,7 @@ This command returns configuration object for working with CosmosDB account myCo
 
         $script:httpClient = new-object System.Net.Http.HttpClient
         $script:Configuration = [PSCustomObject]@{
+            PSTypeName = "CosmosLite.Connection"
             AccountName = $AccountName
             Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
             RetryCount = $RetryCount
@@ -183,11 +184,10 @@ This command returns configuration object for working with CosmosDB account myCo
                         break;
                     }
                 }
-                $script:Configuration.psobject.typenames.Insert(0,'CosmosLite.Connection.Configuration')
                 $script:Configuration
         }
         catch {
-            throw $_.Exception
+            throw
         }
     }
 }

@@ -9,21 +9,23 @@ function Get-CosmosAccessToken
     Can be used for debug purposes; module itself gets token as needed, including refreshing the tokens when they expire
 
 .OUTPUTS
-    OpentID token as returned by AAD.
+    AuthenticationResult returned by AAD that contains access token and other information about logged-in identity.
+
+.NOTES
+    See https://learn.microsoft.com/en-us/dotnet/api/microsoft.identity.client.authenticationresult
 
 .EXAMPLE
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com | Get-CosmosAccessToken
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mydomain.com | Get-CosmosAccessToken
 
-Description
------------
-This command retrieves configuration for specified CosmosDB account and database, and retrieves access token for it using well-known clientId of Azure PowerShell
-
+    Description
+    -----------
+    This command retrieves configuration for specified CosmosDB account and database, and retrieves access token for it using well-known clientId of Azure PowerShell
 #>
 
     param
     (
         [Parameter(ValueFromPipeline)]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
         $context = $script:Configuration
     )

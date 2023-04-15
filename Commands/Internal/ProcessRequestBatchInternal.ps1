@@ -5,7 +5,7 @@ function ProcessRequestBatchInternal
         [Parameter(Mandatory)]
         [PSCustomObject[]]$Batch,
         [Parameter(Mandatory)]
-        $Context
+        [PSTypeName('CosmosLite.Connection')]$Context
     )
 
     begin

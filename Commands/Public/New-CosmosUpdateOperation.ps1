@@ -16,9 +16,9 @@ function New-CosmosUpdateOperation
     $Updates += New-CosmosUpdateOperation -Operation Add -TargetPath '/arrData/-' -value 'New value to be appended to the end of array'
     Update-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs' -Updates $Updates
 
-Description
------------
-This command replaces field 'content' and adds value to array field 'arrData' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs'
+    Description
+    -----------
+    This command replaces field 'content' and adds value to array field 'arrData' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs'
 #>
 
     [CmdletBinding()]
@@ -52,6 +52,7 @@ This command replaces field 'content' and adds value to array field 'arrData' in
     process
     {
         [PSCustomObject]@{
+            PSTypeName = 'CosmosLite.UpdateOperation'
             op = $ops[$Operation]
             path = $TargetPath
             value = $Value

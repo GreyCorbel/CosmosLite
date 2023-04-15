@@ -6,17 +6,18 @@ function Get-CosmosDocument
 
 .DESCRIPTION
     Retrieves document from the collection by id and partition key
+    Command supports parallel processing.
 
 .OUTPUTS
     Response containing retrieved document parsed from JSON format.
 
 .EXAMPLE
-$rsp = Get-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
-$rsp.data
+    $rsp = Get-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
+    $rsp.data
 
-Description
------------
-This command retrieves document with id = '123' and partition key 'test-docs' from collection 'docs'
+    Description
+    -----------
+    This command retrieves document with id = '123' and partition key 'test-docs' from collection 'docs'
 #>
     param
     (
@@ -37,16 +38,16 @@ This command retrieves document with id = '123' and partition key 'test-docs' fr
 
         [Parameter()]
         [string]
-            #ETag to check. Document is retrieved only if server version of document has different Etag
+            #ETag to check. Document is retrieved only if server version of document has different ETag
         $Etag,
 
         [Parameter()]
         [int]
-            #Degree of paralelism
+            #Degree of paralelism for pipeline processing
         $BatchSize = 1,
 
         [Parameter()]
-        [PSCustomObject]
+        [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
             #Default: connection object produced by most recent call of Connect-Cosmos command
         $Context = $script:Configuration

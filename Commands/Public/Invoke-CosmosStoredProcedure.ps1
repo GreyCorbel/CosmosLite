@@ -6,6 +6,7 @@ function Invoke-CosmosStoredProcedure
 
 .DESCRIPTION
     Calls stored procedure.
+    Command supports parallel processing.
     Note: Stored procedures that return large dataset also support continuation token, however, continuation token must be passed as parameter, corretly passed to query inside store procedure logivc, and returned as part of stored procedure response.
       This means that stored procedure logic is fully responsible for handling paging via continuation tokens. 
       For details, see Cosmos DB server side programming reference
@@ -15,12 +16,12 @@ function Invoke-CosmosStoredProcedure
 
 .EXAMPLE
     $params = @('123', 'test')
-        $rsp = Invoke-CosmosStoredProcedure -Name testSP -Parameters ($params | ConvertTo-Json) -Collection 'docs' -PartitionKey 'test-docs'
-        $rsp
+    $rsp = Invoke-CosmosStoredProcedure -Name testSP -Parameters ($params | ConvertTo-Json) -Collection 'docs' -PartitionKey 'test-docs'
+    $rsp
 
-Description
------------
-This command calls stored procedure and shows result.
+    Description
+    -----------
+    This command calls stored procedure and shows result.
 #>
     [CmdletBinding()]
     param (
@@ -47,15 +48,15 @@ This command calls stored procedure and shows result.
         $Collection,
 
         [Parameter()]
-        [PSCustomObject]
-            #Connection configuration object
-            #Default: connection object produced by most recent call of Connect-Cosmos command
-        $Context = $script:Configuration,
+        [int]
+            #Degree of paralelism for pipelinr processing
+        $BatchSize = 1,
 
         [Parameter()]
-        [int]
-            #Degree of paralelism
-        $BatchSize = 1
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
     )
 
     begin
