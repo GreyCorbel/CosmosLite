@@ -75,13 +75,13 @@ foreach($batchSize in $batchSizes)
 ```
 Output shows significant performance gain for batch sizes > 1:
 
-|BatchSize |Duration [ms]|
-|--------- |--------
-|       1  | 40473 
-|       5  | 16884 
-|      10  | 11296
-|      20  | 10265
-|      50  | 8164
+|Batch Size |Duration [ms]|
+|---------  |--------
+|       1   | 40473 
+|       5   | 16884 
+|      10   | 11296
+|      20   | 10265
+|      50   | 8164
 
 ## Authentication
 Module supports OAuth/OpenId Connect authentication with Azure AD in Delegated and Application contexts.
