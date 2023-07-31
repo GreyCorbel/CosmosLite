@@ -95,10 +95,11 @@ function Connect-Cosmos
         $ResourceOwnerCredential,
 
         [Parameter()]
+        [ValidateSet('AzurePublic', 'AzureGermany', 'AzureChina','AzureUsGovernment','None')]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
-        $LoginApi = 'https://login.microsoftonline.com',
+        $AzureCloudInstance = 'AzurePublic',
         
         [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
         [ValidateSet('Interactive', 'DeviceCode')]
@@ -156,15 +157,15 @@ function Connect-Cosmos
                 switch($PSCmdlet.ParameterSetName)
                 {
                     'PublicClient' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RequiredScopes $RequiredScopes -LoginApi $LoginApi -AuthMode $AuthMode -UserNameHint $UserNameHint
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RequiredScopes $RequiredScopes -AzureCloudInstance $AzureCloudInstance -AuthMode $AuthMode -UserNameHint $UserNameHint
                         break;
                     }
                     'ConfidentialClientWithSecret' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -AzureCloudInstance $AzureCloudInstance
                         break;
                     }
                     'ConfidentialClientWithCertificate' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -RequiredScopes $RequiredScopes -AzureCloudInstance $AzureCloudInstance
                         break;
                     }
                     'MSI' {
@@ -180,7 +181,7 @@ function Connect-Cosmos
                         break;
                     }
                     'ResourceOwnerPasssword' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -AzureCloudInstance $AzureCloudInstance -ResourceOwnerCredential $ResourceOwnerCredential
                         break;
                     }
                 }
