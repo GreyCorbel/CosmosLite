@@ -55,6 +55,10 @@ function GetCosmosRequestInternal {
                     if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
                     $retVal.Headers.IfMatch.Add($headerValue)
                 }
+                if($rq.NoContentOfResponse)
+                {
+                    $retVal.Headers.Add('Prefer', 'return-no-content')
+                }
                 break
             }
             default {

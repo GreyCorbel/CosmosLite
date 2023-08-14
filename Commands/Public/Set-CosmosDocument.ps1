@@ -57,6 +57,8 @@ function Set-CosmosDocument
             #Name of collection containing the document
         $Collection,
 
+        [switch]$NoContentOnResponse,
+        
         [Parameter()]
         [string]
             #ETag to check. Document is updated only if server version of document has the same Etag
@@ -98,6 +100,7 @@ function Set-CosmosDocument
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ETag = $ETag
+        $rq.NoContentOfResponse = $NoContentOnResponse
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context

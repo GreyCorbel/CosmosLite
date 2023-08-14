@@ -35,6 +35,8 @@ function Update-CosmosDocument
             #Name of the collection containing updated document
         $Collection,
 
+        [switch]$NoContentOnResponse,
+
         [Parameter()]
         [int]
             #Degree of paralelism for pipeline processing
@@ -58,6 +60,7 @@ function Update-CosmosDocument
         $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Patch
         $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
+        $rq.NoContentOfResponse = $NoContentOnResponse
         $patches = @{
             operations = $UpdateObject.Updates
         }
