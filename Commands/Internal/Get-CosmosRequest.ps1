@@ -36,6 +36,7 @@ function Get-CosmosRequest
             MaxRetries = $Context.RetryCount
             Collection=$Collection
             ETag = $null
+            PriorityLevel = $null
         }
     }
 }

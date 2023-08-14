@@ -57,6 +57,13 @@ function New-CosmosDocument
             #ETag to check. Document is upserted only if server version of document has the same Etag
         $Etag,
 
+        [Parameter()]
+        [ValidateSet('High','Low')]
+        [string]
+            #Priority assigned to request
+            #High priority requests have less chance to get throttled than Low priority requests when throttlig occurs
+        $Priority,
+
         [switch]
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
@@ -101,6 +108,7 @@ function New-CosmosDocument
         $rq.Uri = new-object System.Uri($url)
         $rq.Payload = $Document
         $rq.ETag = $ETag
+        $rq.PriorityLevel = $Priority
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context

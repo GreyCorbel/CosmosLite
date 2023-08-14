@@ -42,6 +42,13 @@ function Get-CosmosDocument
         $Etag,
 
         [Parameter()]
+        [ValidateSet('High','Low')]
+        [string]
+            #Priority assigned to request
+            #High priority requests have less chance to get throttled than Low priority requests when throttlig occurs
+        $Priority,
+
+        [Parameter()]
         [int]
             #Degree of paralelism for pipeline processing
         $BatchSize = 1,
@@ -65,6 +72,7 @@ function Get-CosmosDocument
         $rq.Method = [System.Net.Http.HttpMethod]::Get
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.ETag = $ETag
+        $rq.PriorityLevel = $Priority
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
         if($outstandingRequests.Count -ge $batchSize)

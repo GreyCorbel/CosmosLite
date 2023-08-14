@@ -64,6 +64,12 @@ function GetCosmosRequestInternal {
                     if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
                     $retVal.Headers.IfNoneMatch.Add($headerValue)
                 }
+                if(-not [string]::IsNullOrEmpty($rq.PriorityLevel))
+                {
+                    #Write-Verbose "Setting 'x-ms-cosmos-priority-level' to $($rq.x-ms-cosmos-priority-level)"
+                    $retVal.Headers.Add('x-ms-cosmos-priority-level', $rq.PriorityLevel)
+                }
+
                 break;
             }
         }
