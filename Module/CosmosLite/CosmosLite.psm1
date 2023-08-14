@@ -61,6 +61,10 @@ function Connect-Cosmos
             #Name of database in CosmosDB account
         $Database,
 
+        [Parameter(ParameterSetName = 'ExistingFactory')]
+        [object]
+            #Existing factory to use rather than create a new one
+        $Factory,
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
@@ -96,10 +100,11 @@ function Connect-Cosmos
         $ResourceOwnerCredential,
 
         [Parameter()]
+        [ValidateSet('AzurePublic', 'AzureGermany', 'AzureChina','AzureUsGovernment','None')]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
-        $LoginApi = 'https://login.microsoftonline.com',
+        $AzureCloudInstance = 'AzurePublic',
         
         [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
         [ValidateSet('Interactive', 'DeviceCode')]
@@ -148,40 +153,43 @@ function Connect-Cosmos
             RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
+            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
         }
-
-        $RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
 
         if($null -eq $script:AuthFactories) {$script:AuthFactories = @{}}
         try {
                 switch($PSCmdlet.ParameterSetName)
                 {
+                    'ExistingFactory' {
+                        $script:AuthFactories[$AccountName] = $Factory
+                        break;
+                    }
                     'PublicClient' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RequiredScopes $RequiredScopes -LoginApi $LoginApi -AuthMode $AuthMode -UserNameHint $UserNameHint
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -AzureCloudInstance $AzureCloudInstance -AuthMode $AuthMode -UserNameHint $UserNameHint
                         break;
                     }
                     'ConfidentialClientWithSecret' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance
                         break;
                     }
                     'ConfidentialClientWithCertificate' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -RequiredScopes $RequiredScopes -LoginApi $LoginApi
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -AzureCloudInstance $AzureCloudInstance
                         break;
                     }
                     'MSI' {
                         if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
                         {
-                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -RequiredScopes $RequiredScopes -UseManagedIdentity
+                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity
                         }
                         else 
                         {
                             #default clientId does not fit here - we do not pass it to the factory
-                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -RequiredScopes $RequiredScopes -UseManagedIdentity
+                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -UseManagedIdentity
                         }
                         break;
                     }
                     'ResourceOwnerPasssword' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -RequiredScopes $RequiredScopes -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential
+                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance -ResourceOwnerCredential $ResourceOwnerCredential
                         break;
                     }
                 }
@@ -236,7 +244,7 @@ function Get-CosmosAccessToken
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
         }
 
-        Get-AadToken -Factory $script:AuthFactories[$context.AccountName]
+        Get-AadToken -Factory $script:AuthFactories[$context.AccountName] -Scopes $context.RequiredScopes
     }
 }
 function Get-CosmosDocument
