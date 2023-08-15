@@ -65,6 +65,7 @@ function Connect-Cosmos
         [object]
             #Existing factory to use rather than create a new one
         $Factory,
+
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
@@ -79,6 +80,12 @@ function Connect-Cosmos
             #ClientId of application that gets token to CosmosDB.
             #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
         $ClientId = '1950a258-227b-4e31-a9cf-717495945fc2',
+
+        [Parameter()]
+        [Uri]
+            #RedirectUri for the client
+            #Default: default MSAL redirect Uri
+        $RedirectUri,
 
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [string]
@@ -100,14 +107,13 @@ function Connect-Cosmos
         $ResourceOwnerCredential,
 
         [Parameter()]
-        [ValidateSet('AzurePublic', 'AzureGermany', 'AzureChina','AzureUsGovernment','None')]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
-        $AzureCloudInstance = 'AzurePublic',
+        $LoginApi = 'https://login.microsoftonline.com',
         
         [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
-        [ValidateSet('Interactive', 'DeviceCode')]
+        [ValidateSet('Interactive', 'DeviceCode', 'WIA', 'WAM')]
         [string]
             #How to authenticate client - via web view or via device code flow
         $AuthMode,
@@ -126,10 +132,13 @@ function Connect-Cosmos
             #Whether to collect all response headers
         $CollectResponseHeaders,
 
-        [Parameter()]
-        [string]
-            #Name of the proxy if connection to Azure has to go via proxy server
-        $Proxy,
+        [Parameter(ParameterSetName = 'PublicClient')]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
+        [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [System.Net.WebProxy]
+            #WebProxy object if connection to Azure has to go via proxy server
+        $Proxy = $null,
         [Parameter()]
         [int]
             #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
@@ -138,11 +147,9 @@ function Connect-Cosmos
 
     process
     {
-        if(-not [string]::IsNullOrWhitespace($proxy))
+        if($null -ne $proxy)
         {
-            [system.net.webrequest]::defaultwebproxy = new-object system.net.webproxy($Proxy)
-            [system.net.webrequest]::defaultwebproxy.credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
-            [system.net.webrequest]::defaultwebproxy.BypassProxyOnLocal = $true
+            [system.net.webrequest]::defaultwebproxy = $Proxy
         }
 
         $script:httpClient = new-object System.Net.Http.HttpClient
@@ -154,6 +161,7 @@ function Connect-Cosmos
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
             RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
+            AuthFactory = $null
         }
 
         if($null -eq $script:AuthFactories) {$script:AuthFactories = @{}}
@@ -165,34 +173,40 @@ function Connect-Cosmos
                         break;
                     }
                     'PublicClient' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -AzureCloudInstance $AzureCloudInstance -AuthMode $AuthMode -UserNameHint $UserNameHint
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
+                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'ConfidentialClientWithSecret' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
+                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'ConfidentialClientWithCertificate' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -AzureCloudInstance $AzureCloudInstance
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
+                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'MSI' {
                         if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
                         {
-                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity
+                            $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
                         }
                         else 
                         {
                             #default clientId does not fit here - we do not pass it to the factory
-                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -UseManagedIdentity
+                            $Factory = New-AadAuthenticationFactory -UseManagedIdentity -Proxy $proxy
                         }
+                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'ResourceOwnerPasssword' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance -ResourceOwnerCredential $ResourceOwnerCredential
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
+                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                 }
+                $script:Configuration.AuthFactory = $Factory
                 $script:Configuration
         }
         catch {
@@ -239,12 +253,12 @@ function Get-CosmosAccessToken
             throw "Call Connect-Cosmos first"
         }
 
-        if($null -eq $script:AuthFactories[$context.AccountName])
+        if($null -eq $context.AuthFactory)
         {
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
         }
-
-        Get-AadToken -Factory $script:AuthFactories[$context.AccountName] -Scopes $context.RequiredScopes
+        #we specify scopes here in case that user pushes own factory without properly specified default scopes
+        Get-AadToken -Factory $context.AuthFactory -Scopes $context.RequiredScopes
     }
 }
 function Get-CosmosDocument
@@ -291,6 +305,14 @@ function Get-CosmosDocument
         $Etag,
 
         [Parameter()]
+        [ValidateSet('High','Low')]
+        [string]
+            #Priority assigned to request
+            #High priority requests have less chance to get throttled than Low priority requests when throttlig occurs
+            #Default: High
+        $Priority,
+
+        [Parameter()]
         [int]
             #Degree of paralelism for pipeline processing
         $BatchSize = 1,
@@ -314,6 +336,7 @@ function Get-CosmosDocument
         $rq.Method = [System.Net.Http.HttpMethod]::Get
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.ETag = $ETag
+        $rq.PriorityLevel = $Priority
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
         if($outstandingRequests.Count -ge $batchSize)
@@ -688,6 +711,13 @@ function New-CosmosDocument
             #ETag to check. Document is upserted only if server version of document has the same Etag
         $Etag,
 
+        [Parameter()]
+        [ValidateSet('High','Low')]
+        [string]
+            #Priority assigned to request
+            #High priority requests have less chance to get throttled than Low priority requests when throttlig occurs
+        $Priority,
+
         [switch]
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
@@ -732,6 +762,7 @@ function New-CosmosDocument
         $rq.Uri = new-object System.Uri($url)
         $rq.Payload = $Document
         $rq.ETag = $ETag
+        $rq.PriorityLevel = $Priority
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
@@ -964,6 +995,8 @@ function Set-CosmosDocument
             #Name of collection containing the document
         $Collection,
 
+        [switch]$NoContentOnResponse,
+        
         [Parameter()]
         [string]
             #ETag to check. Document is updated only if server version of document has the same Etag
@@ -1005,6 +1038,7 @@ function Set-CosmosDocument
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ETag = $ETag
+        $rq.NoContentOfResponse = $NoContentOnResponse
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
@@ -1099,6 +1133,8 @@ function Update-CosmosDocument
             #Name of the collection containing updated document
         $Collection,
 
+        [switch]$NoContentOnResponse,
+
         [Parameter()]
         [int]
             #Degree of paralelism for pipeline processing
@@ -1122,6 +1158,7 @@ function Update-CosmosDocument
         $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
         $rq.Method = [System.Net.Http.HttpMethod]::Patch
         $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
+        $rq.NoContentOfResponse = $NoContentOnResponse
         $patches = @{
             operations = $UpdateObject.Updates
         }
@@ -1188,6 +1225,8 @@ function Get-CosmosRequest
             MaxRetries = $Context.RetryCount
             Collection=$Collection
             ETag = $null
+            PriorityLevel = $null
+            NoContentOfResponse = $false
         }
     }
 }
@@ -1248,6 +1287,10 @@ function GetCosmosRequestInternal {
                     if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
                     $retVal.Headers.IfMatch.Add($headerValue)
                 }
+                if($rq.NoContentOfResponse)
+                {
+                    $retVal.Headers.Add('Prefer', 'return-no-content')
+                }
                 break
             }
             default {
@@ -1257,6 +1300,12 @@ function GetCosmosRequestInternal {
                     if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
                     $retVal.Headers.IfNoneMatch.Add($headerValue)
                 }
+                if(-not [string]::IsNullOrEmpty($rq.PriorityLevel))
+                {
+                    #Write-Verbose "Setting 'x-ms-cosmos-priority-level' to $($rq.x-ms-cosmos-priority-level)"
+                    $retVal.Headers.Add('x-ms-cosmos-priority-level', $rq.PriorityLevel)
+                }
+
                 break;
             }
         }

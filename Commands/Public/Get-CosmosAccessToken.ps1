@@ -37,11 +37,11 @@ function Get-CosmosAccessToken
             throw "Call Connect-Cosmos first"
         }
 
-        if($null -eq $script:AuthFactories[$context.AccountName])
+        if($null -eq $context.AuthFactory)
         {
             throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
         }
         #we specify scopes here in case that user pushes own factory without properly specified default scopes
-        Get-AadToken -Factory $script:AuthFactories[$context.AccountName] -Scopes $context.RequiredScopes
+        Get-AadToken -Factory $context.AuthFactory -Scopes $context.RequiredScopes
     }
 }

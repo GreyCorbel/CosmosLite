@@ -46,6 +46,7 @@ function Get-CosmosDocument
         [string]
             #Priority assigned to request
             #High priority requests have less chance to get throttled than Low priority requests when throttlig occurs
+            #Default: High
         $Priority,
 
         [Parameter()]

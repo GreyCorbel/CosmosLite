@@ -82,7 +82,6 @@ function Invoke-CosmosQuery
 
     process
     {
-
         $rq = Get-CosmosRequest `
             -PartitionKey $partitionKey `
             -Type Query `

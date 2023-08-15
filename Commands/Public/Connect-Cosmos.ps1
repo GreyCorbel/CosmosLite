@@ -160,45 +160,46 @@ function Connect-Cosmos
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
             RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
+            AuthFactory = $null
         }
 
-        if($null -eq $script:AuthFactories) {$script:AuthFactories = @{}}
         try {
                 switch($PSCmdlet.ParameterSetName)
                 {
                     'ExistingFactory' {
-                        $script:AuthFactories[$AccountName] = $Factory
+                        #nothing specific here
                         break;
                     }
                     'PublicClient' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
                         break;
                     }
                     'ConfidentialClientWithSecret' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
                         break;
                     }
                     'ConfidentialClientWithCertificate' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
                         break;
                     }
                     'MSI' {
                         if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
                         {
-                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
+                            $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
                         }
                         else 
                         {
                             #default clientId does not fit here - we do not pass it to the factory
-                            $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -UseManagedIdentity -Proxy $proxy
+                            $Factory = New-AadAuthenticationFactory -UseManagedIdentity -Proxy $proxy
                         }
                         break;
                     }
                     'ResourceOwnerPasssword' {
-                        $script:AuthFactories[$AccountName] = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
                         break;
                     }
                 }
+                $script:Configuration.AuthFactory = $Factory
                 $script:Configuration
         }
         catch {
