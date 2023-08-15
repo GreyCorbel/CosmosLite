@@ -79,7 +79,7 @@ function Connect-Cosmos
         [string]
             #ClientId of application that gets token to CosmosDB.
             #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
-        $ClientId = '1950a258-227b-4e31-a9cf-717495945fc2',
+        $ClientId = (Get-AadDefaultClientId),
 
         [Parameter()]
         [Uri]
@@ -164,45 +164,31 @@ function Connect-Cosmos
             AuthFactory = $null
         }
 
-        if($null -eq $script:AuthFactories) {$script:AuthFactories = @{}}
         try {
                 switch($PSCmdlet.ParameterSetName)
                 {
                     'ExistingFactory' {
-                        $script:AuthFactories[$AccountName] = $Factory
+                        #nothing specific here
                         break;
                     }
                     'PublicClient' {
                         $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
-                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'ConfidentialClientWithSecret' {
                         $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
-                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'ConfidentialClientWithCertificate' {
                         $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
-                        $script:AuthFactories[$AccountName] = $Factory
                         break;
                     }
                     'MSI' {
-                        if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
-                        {
-                            $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
-                        }
-                        else 
-                        {
-                            #default clientId does not fit here - we do not pass it to the factory
-                            $Factory = New-AadAuthenticationFactory -UseManagedIdentity -Proxy $proxy
-                        }
-                        $script:AuthFactories[$AccountName] = $Factory
+                        $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
                         break;
                     }
                     'ResourceOwnerPasssword' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -ClientSecret $clientSecret -AzureCloudInstance $AzureCloudInstance -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
-                        $script:AuthFactories[$AccountName] = $Factory
+                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
                         break;
                     }
                 }
@@ -437,7 +423,6 @@ function Invoke-CosmosQuery
 
     process
     {
-
         $rq = Get-CosmosRequest `
             -PartitionKey $partitionKey `
             -Type Query `

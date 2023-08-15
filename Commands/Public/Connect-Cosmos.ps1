@@ -78,7 +78,7 @@ function Connect-Cosmos
         [string]
             #ClientId of application that gets token to CosmosDB.
             #Default: well-known clientId for Azure PowerShell - it already has pre-configured Delegated permission to access CosmosDB resource
-        $ClientId = '1950a258-227b-4e31-a9cf-717495945fc2',
+        $ClientId = (Get-AadDefaultClientId),
 
         [Parameter()]
         [Uri]
@@ -183,15 +183,7 @@ function Connect-Cosmos
                         break;
                     }
                     'MSI' {
-                        if($ClientId -ne '1950a258-227b-4e31-a9cf-717495945fc2')
-                        {
-                            $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
-                        }
-                        else 
-                        {
-                            #default clientId does not fit here - we do not pass it to the factory
-                            $Factory = New-AadAuthenticationFactory -UseManagedIdentity -Proxy $proxy
-                        }
+                        $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
                         break;
                     }
                     'ResourceOwnerPasssword' {
