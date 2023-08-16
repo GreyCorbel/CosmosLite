@@ -62,6 +62,21 @@ function ProcessCosmosResponseInternal
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
             }
         }
+        if(-not $retVal['IsSuccess'])
+        {
+            $ex = [CosmosLiteException]::new($retVal['Data'].code, $retVal['Data'].message)
+            switch($ErrorActionPreference)
+            {
+                'Stop' {
+                    throw $ex
+                    break;
+                }
+                'Continue' {
+                    Write-Error $ex
+                    break;
+                }
+            }
+        }
         [PSCustomObject]$retVal
     }
 }

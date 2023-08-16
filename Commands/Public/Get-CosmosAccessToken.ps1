@@ -34,12 +34,13 @@ function Get-CosmosAccessToken
     {
         if([string]::IsNullOrEmpty($context))
         {
-            throw "Call Connect-Cosmos first"
+            throw ([CosmosLiteException]::new('NotInitialized', 'Call Connect-Cosmos first'))
         }
 
         if($null -eq $context.AuthFactory)
         {
-            throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
+            throw ([CosmosLiteException]::new('NotInitialized', "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"))
+
         }
         #we specify scopes here in case that user pushes own factory without properly specified default scopes
         Get-AadToken -Factory $context.AuthFactory -Scopes $context.RequiredScopes

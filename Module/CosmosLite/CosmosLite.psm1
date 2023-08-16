@@ -1,3 +1,16 @@
+#region Definitions
+class CosmosLiteException : Exception {
+    [string] $code
+
+    CosmosLiteException($Code, $Message) : base($Message) {
+        $this.Code = $code
+    }
+
+    [string] ToString() {
+        return "$($this.Code): $($this.Message)"
+     }
+}
+#endregion Definitions
 #region Public commands
 function Connect-Cosmos
 {
@@ -236,12 +249,13 @@ function Get-CosmosAccessToken
     {
         if([string]::IsNullOrEmpty($context))
         {
-            throw "Call Connect-Cosmos first"
+            throw ([CosmosLiteException]::new('NotInitialized', 'Call Connect-Cosmos first'))
         }
 
         if($null -eq $context.AuthFactory)
         {
-            throw "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"
+            throw ([CosmosLiteException]::new('NotInitialized', "Call Connect-Cosmos first for CosmosDB account = $($context.AccountName)"))
+
         }
         #we specify scopes here in case that user pushes own factory without properly specified default scopes
         Get-AadToken -Factory $context.AuthFactory -Scopes $context.RequiredScopes
@@ -1371,6 +1385,21 @@ function ProcessCosmosResponseInternal
             }
             catch {
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
+            }
+        }
+        if(-not $retVal['IsSuccess'])
+        {
+            $ex = [CosmosLiteException]::new($retVal['Data'].code, $retVal['Data'].message)
+            switch($ErrorActionPreference)
+            {
+                'Stop' {
+                    throw $ex
+                    break;
+                }
+                'Continue' {
+                    Write-Error $ex
+                    break;
+                }
             }
         }
         [PSCustomObject]$retVal

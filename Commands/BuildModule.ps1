@@ -3,7 +3,15 @@ param
     [string]$rootPath = '.'
 )
 $moduleFile = "$rootPath\Module\CosmosLite\CosmosLite.psm1"
-'#region Public commands' | Out-File -FilePath $moduleFile
+
+'#region Definitions' | Out-File -FilePath $moduleFile
+foreach($file in Get-ChildItem -Path "$rootPath\Commands\Definitions")
+{
+    Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
+}
+'#endregion Definitions' | Out-File -FilePath $moduleFile -Append
+
+'#region Public commands' | Out-File -FilePath $moduleFile -Append
 foreach($file in Get-ChildItem -Path "$rootPath\Commands\Public")
 {
     Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
