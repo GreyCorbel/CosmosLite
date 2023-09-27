@@ -1,9 +1,11 @@
+
 #region Initialization
 if($PSEdition -eq 'Desktop')
 {
     add-type -AssemblyName system.web
 }
 #endregion Initialization
+
 #region Definitions
 class CosmosLiteException : Exception {
     [string] $code
@@ -17,7 +19,8 @@ class CosmosLiteException : Exception {
      }
 }
 #endregion Definitions
-#region Public commands
+
+#region Public
 function Connect-Cosmos
 {
     <#
@@ -1191,8 +1194,9 @@ function Update-CosmosDocument
         }
     }
 }
-#endregion Public commands
-#region Internal commands
+#endregion Public
+
+#region Internal
 function Get-CosmosRequest
 {
     param(
@@ -1513,4 +1517,5 @@ function SendRequestInternal
         }
     }
 }
-#endregion Internal commands
+#endregion Internal
+

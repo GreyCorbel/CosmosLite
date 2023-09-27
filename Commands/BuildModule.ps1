@@ -4,30 +4,15 @@ param
 )
 $moduleFile = "$rootPath\Module\CosmosLite\CosmosLite.psm1"
 
-'#region Initialization' | Out-File -FilePath $moduleFile
-foreach($file in Get-ChildItem -Path "$rootPath\Commands\Initialization")
-{
-    Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
-}
-'#endregion Initialization' | Out-File -FilePath $moduleFile -Append
+'' | Out-File -FilePath $moduleFile
 
-'#region Definitions' | Out-File -FilePath $moduleFile -Append
-foreach($file in Get-ChildItem -Path "$rootPath\Commands\Definitions")
+$parts = 'Initialization', 'Definitions', 'Public', 'Internal'
+foreach($part in $parts)
 {
-    Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
+    "#region $part" | Out-File -FilePath $moduleFile -Append
+    foreach($file in Get-ChildItem -Path "$rootPath\Commands\$part")
+    {
+        Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
+    }
+    "#endregion $part`n" | Out-File -FilePath $moduleFile -Append
 }
-'#endregion Definitions' | Out-File -FilePath $moduleFile -Append
-
-'#region Public commands' | Out-File -FilePath $moduleFile -Append
-foreach($file in Get-ChildItem -Path "$rootPath\Commands\Public")
-{
-    Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
-}
-'#endregion Public commands' | Out-File -FilePath $moduleFile -Append
-
-'#region Internal commands' | Out-File -FilePath $moduleFile -Append
-foreach($file in Get-ChildItem -Path "$rootPath\Commands\Internal")
-{
-    Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
-}
-'#endregion Internal commands' | Out-File -FilePath $moduleFile -Append
