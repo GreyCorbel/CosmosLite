@@ -58,7 +58,8 @@ function Update-CosmosDocument
     process
     {
         $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
-        $rq.Method = [System.Net.Http.HttpMethod]::Patch
+        #PS5.1 does not suppoort Patch method
+        $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
         $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
         $rq.NoContentOfResponse = $NoContentOnResponse.IsPresent
         $patches = @{

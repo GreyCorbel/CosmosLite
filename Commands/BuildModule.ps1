@@ -4,7 +4,14 @@ param
 )
 $moduleFile = "$rootPath\Module\CosmosLite\CosmosLite.psm1"
 
-'#region Definitions' | Out-File -FilePath $moduleFile
+'#region Initialization' | Out-File -FilePath $moduleFile
+foreach($file in Get-ChildItem -Path "$rootPath\Commands\Initialization")
+{
+    Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
+}
+'#endregion Initialization' | Out-File -FilePath $moduleFile -Append
+
+'#region Definitions' | Out-File -FilePath $moduleFile -Append
 foreach($file in Get-ChildItem -Path "$rootPath\Commands\Definitions")
 {
     Get-Content $file.FullName | Out-File -FilePath $moduleFile -Append
