@@ -159,7 +159,7 @@ function Connect-Cosmos
             RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
-            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
+            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
         }
 

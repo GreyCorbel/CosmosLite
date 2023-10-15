@@ -182,7 +182,7 @@ function Connect-Cosmos
             RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
-            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")
+            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
         }
 
@@ -268,6 +268,27 @@ function Get-CosmosAccessToken
         }
         #we specify scopes here in case that user pushes own factory without properly specified default scopes
         Get-AadToken -Factory $context.AuthFactory -Scopes $context.RequiredScopes
+    }
+}
+function Get-CosmosConnection
+{
+<#
+.SYNOPSIS
+    Returns most recently created Cosmos connection object
+
+.DESCRIPTION
+    Returns most recently created cosmos connection object that is cached inside the module.
+    Useful when you do not want to keep connection object in variable and reach for it only when needed
+
+.OUTPUTS
+    Connection configuration object.
+
+#>
+    param ()
+
+    process
+    {
+        $script:Configuration
     }
 }
 function Get-CosmosDocument
@@ -432,6 +453,11 @@ function Invoke-CosmosQuery
             #Continuation token. Used to ask for next page of results
         $ContinuationToken,
 
+        [switch]
+            #when response contains continuation token, returns the reesponse and automatically sends new request with continuation token
+            #this simnlifies getting all data from query for large datasets
+        $AutoContinue,
+
         [Parameter()]
         [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
@@ -446,35 +472,43 @@ function Invoke-CosmosQuery
 
     process
     {
-        $rq = Get-CosmosRequest `
-            -PartitionKey $partitionKey `
-            -Type Query `
-            -MaxItems $MaxItems `
-            -Continuation $ContinuationToken `
-            -Context $Context `
-            -Collection $Collection
-
-        $QueryDefinition = @{
-            query = $Query
-        }
-        if($null -ne $QueryParameters)
+        do
         {
-            $QueryDefinition['parameters']=@()
-            foreach($key in $QueryParameters.Keys)
+            $rq = Get-CosmosRequest `
+                -PartitionKey $partitionKey `
+                -Type Query `
+                -MaxItems $MaxItems `
+                -Continuation $ContinuationToken `
+                -Context $Context `
+                -Collection $Collection
+
+            $QueryDefinition = @{
+                query = $Query
+            }
+            if($null -ne $QueryParameters)
             {
-                $QueryDefinition['parameters']+=@{
-                    name=$key
-                    value=$QueryParameters[$key]
+                $QueryDefinition['parameters']=@()
+                foreach($key in $QueryParameters.Keys)
+                {
+                    $QueryDefinition['parameters']+=@{
+                        name=$key
+                        value=$QueryParameters[$key]
+                    }
                 }
             }
-        }
-        $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $uri = "$url"
-        $rq.Uri = New-Object System.Uri($uri)
-        $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
-        $rq.ContentType = 'application/query+json'
+            $rq.Method = [System.Net.Http.HttpMethod]::Post
+            $uri = "$url"
+            $rq.Uri = New-Object System.Uri($uri)
+            $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
+            $rq.ContentType = 'application/query+json'
 
-        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+            $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+            $response
+            #auto-continue if requested
+            if(-not $AutoContinue) {break;}
+            if([string]::IsNullOrEmpty($response.Continuation)) {break;}
+            $ContinuationToken = $response.Continuation
+        }while($true)
     }
 }
 function Invoke-CosmosStoredProcedure

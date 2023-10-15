@@ -68,6 +68,11 @@ function Invoke-CosmosQuery
             #Continuation token. Used to ask for next page of results
         $ContinuationToken,
 
+        [switch]
+            #when response contains continuation token, returns the reesponse and automatically sends new request with continuation token
+            #this simnlifies getting all data from query for large datasets
+        $AutoContinue,
+
         [Parameter()]
         [PSTypeName('CosmosLite.Connection')]
             #Connection configuration object
@@ -82,34 +87,42 @@ function Invoke-CosmosQuery
 
     process
     {
-        $rq = Get-CosmosRequest `
-            -PartitionKey $partitionKey `
-            -Type Query `
-            -MaxItems $MaxItems `
-            -Continuation $ContinuationToken `
-            -Context $Context `
-            -Collection $Collection
-
-        $QueryDefinition = @{
-            query = $Query
-        }
-        if($null -ne $QueryParameters)
+        do
         {
-            $QueryDefinition['parameters']=@()
-            foreach($key in $QueryParameters.Keys)
+            $rq = Get-CosmosRequest `
+                -PartitionKey $partitionKey `
+                -Type Query `
+                -MaxItems $MaxItems `
+                -Continuation $ContinuationToken `
+                -Context $Context `
+                -Collection $Collection
+
+            $QueryDefinition = @{
+                query = $Query
+            }
+            if($null -ne $QueryParameters)
             {
-                $QueryDefinition['parameters']+=@{
-                    name=$key
-                    value=$QueryParameters[$key]
+                $QueryDefinition['parameters']=@()
+                foreach($key in $QueryParameters.Keys)
+                {
+                    $QueryDefinition['parameters']+=@{
+                        name=$key
+                        value=$QueryParameters[$key]
+                    }
                 }
             }
-        }
-        $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $uri = "$url"
-        $rq.Uri = New-Object System.Uri($uri)
-        $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
-        $rq.ContentType = 'application/query+json'
+            $rq.Method = [System.Net.Http.HttpMethod]::Post
+            $uri = "$url"
+            $rq.Uri = New-Object System.Uri($uri)
+            $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
+            $rq.ContentType = 'application/query+json'
 
-        ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+            $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+            $response
+            #auto-continue if requested
+            if(-not $AutoContinue) {break;}
+            if([string]::IsNullOrEmpty($response.Continuation)) {break;}
+            $ContinuationToken = $response.Continuation
+        }while($true)
     }
 }
