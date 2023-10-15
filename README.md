@@ -8,7 +8,7 @@ This simple module is specialized on data manipulation in Cosmos DB. I originall
 - it does unnecessary modifications on the documents, so you cannot simply do something like Get-Document | Update-Document
   - it adds props like attachments, timestamp, etc and those properties get written back to DB if you are not careful, bloating the doc with unwanted duplicate data
 
-So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authetication (no plans to add access key based auth)
+So I ended up with this module that contains just data manipulation routines, is designed primarily for Core edition of PowerShell and uses OAuth authentication (no plans to add access key based auth)
 
 *Note*: CosmosLite uses [AadAuthenticationFactory](https://github.com/GreyCorbel/AadAuthenticationFactory) module that implements various ways for authentication with Azure AD - form interactive login as user, over unattended authentication with Client ID and secret/certificate to AAD Managed Identity.
 
@@ -93,12 +93,12 @@ Authentication is implemented by utility module [AadAuthenticationFactory](https
 
 For Public client flow, authentication uses well-known ClientId for Azure Powershell by default, or you can use your app registered with your tenant, if you wish.
 
-For Confidential client flow, use own ClientId with Client Secret or Certificate.
+For Confidential client flow, use own ClientId with Client Secret or Certificate, or Azure Managed Identity when running in supported environment.
 
 For Azure Managed identity, supported environments are Azure VM and Azure App Service / App Function / Azure Automation - all cases with System Managed Identity and User-assigned Managed Identity.  
 Arc-enabled server running out of Azure are also supported.
 
-Supported authentication flows for Public client are `Interactive` (via web view/browser) or `DeviceCode` (with code displayed on command line and authentication handled by user in independent browser session)
+Supported authentication flows for Public client are `Interactive` (via web view/browser), `DeviceCode` (with code displayed on command line and authentication handled by user in independent browser session), `WIA` (Windows integrated authentication with ADFS), or `WAM` (transparent Web Authentication Manager available on AAD joined machines)
 
 Authentication allows separate credentials for every Cosmos DB account, so in single script / powershell session, you can connect to multiple Cosmos DB accounts and databases with different credentials at the same time - just store connection returned by `Connect-Cosmos` command in variable and use it as needed.
 
@@ -111,7 +111,7 @@ Few samples below, also see help that comes with commands of the module.
 $ctx = Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydomain.com' -AuthMode Interactive
 
 #connect to cosmos db account myCosmosDbAccount and db myDbInCosmosAccount with appID and certificate
-#returned context is automatically stored and used for subsequent call of other commands
+#returned context is automatically stored inside the module and used for subsequent calls of other commands
 $thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
 $appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
 $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
@@ -161,6 +161,26 @@ do
     throw $rslt.data
   }
 }while($null -ne $rslt.Continuation)
+```
+
+Same query as above, now with AutoContinue parameter - code is much simpler as command takes care for iteration while Cosmos API returns continuation token
+```powershell
+#invoke Cosmos query returning large resultset and measure total RU consumption
+$query = "select * from c where c.partitionKey = 'sample-docs'"
+$totalRU = 0
+Invoke-CosmosQuery -Query $query -PartitionKey 'sample-docs' -AutoContinue `
+| Foreach-Object{
+  if($_.IsSuccess)
+    {
+      $totalRU+=$_.charge
+      $_.Data.Documents
+    }
+    else
+    {
+      #contains error returned by server
+      throw $_.data
+    }
+}
 ```
 
 Parametrized query that pipes returned documents to be updated by bulk update:
