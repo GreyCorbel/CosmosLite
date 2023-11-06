@@ -88,6 +88,9 @@ function Set-CosmosDocument
         {
             #to change document Id, you cannot use DocumentObject parameter set
             $Id = $DocumentObject.id
+            #when in pipeline in PS5.1, parameter retains value across invocations
+            $PartitionKey = @()
+
             foreach($attribute in $PartitionKeyAttribute)
             {
                 $PartitionKey+=$DocumentObject."$attribute"

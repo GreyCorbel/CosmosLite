@@ -91,6 +91,8 @@ function New-CosmosDocument
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
+            #when in pipeline in PS5.1, parameter retains value across invocations
+            $PartitionKey = @()
             foreach($attribute in $PartitionKeyAttribute)
             {
                 $PartitionKey+=$DocumentObject."$attribute"
