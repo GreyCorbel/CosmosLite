@@ -32,8 +32,37 @@ jobs:
       run: |
         Install-Module AadAuthenticationFactory -AllowPrerelease -Force -Scope CurrentUser -Verbose
       
+    - name: Install AzureSignTool
+      shell: pwsh
+      run: |
+        dotnet tool install --global AzureSignTool
+
+    - name: Sign files
+      shell: pwsh
+      run: |
+        $files = Get-ChildItem "$env:GITHUB_WORKSPACE\Module" -File -Recurse -Include *.ps1, *.ps1xml, *.psd1, *.psm1, *.pssc, *.psrc, *.cdxml
+        try {
+            foreach ($file in $files) {
+                azuresigntool sign `
+                    -kvu ${{ vars.CODESIGNING_KEYVAULTURI }} `
+                    -kvi ${{ vars.TENANTINTEGRATION_CLIENTID }} `
+                    -kvt ${{ vars.TENANTINTEGRATION_TENANTID }} `
+                    -kvs ${{ secrets.TENANTINTEGRATION_CLIENTSECRET }} `
+                    -kvc ${{ vars.CODESIGNING_CERTNAME }} `
+                    -tr 'http://timestamp.digicert.com' `
+                    -v "$($file.FullName)" 
+            }
+        }
+        catch {
+            Write-Host "Error: $($_.Exception)"
+            throw
+        }
+        Write-Host "Signed files summary:"
+        Get-AuthenticodeSignature -FilePath $files
+
     - name: Publish
       #Publish to PS Gallery
+      if: ${{ github.event_name != 'workflow_dispatch' }}
       shell: pwsh
       env:
         SECRET: ${{ secrets.PSGallery_APIKey }}
