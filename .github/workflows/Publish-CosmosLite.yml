@@ -30,7 +30,7 @@ jobs:
     - name: Install prerequisites
       shell: pwsh
       run: |
-        Install-Module AadAuthenticationFactory -AllowPrerelease -Force -Scope CurrentUser -Verbose
+        Install-Module AadAuthenticationFactory -AllowPrerelease -Force -Scope CurrentUser
       
     - name: Install AzureSignTool
       shell: pwsh
