@@ -57,7 +57,9 @@ function Set-CosmosDocument
             #Name of collection containing the document
         $Collection,
 
-        [switch]$NoContentOnResponse,
+        [switch]
+            #asks server not to include replaced document in response data
+        $NoContentOnResponse,
         
         [Parameter()]
         [string]
@@ -103,7 +105,7 @@ function Set-CosmosDocument
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ETag = $ETag
-        $rq.NoContentOfResponse = $NoContentOnResponse
+        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context

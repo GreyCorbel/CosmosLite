@@ -37,7 +37,7 @@ function Get-CosmosRequest
             Collection=$Collection
             ETag = $null
             PriorityLevel = $null
-            NoContentOfResponse = $false
+            NoContentOnResponse = $false
         }
     }
 }

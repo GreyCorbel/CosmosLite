@@ -787,6 +787,8 @@ function New-CosmosDocument
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
+            #when in pipeline in PS5.1, parameter retains value across invocations
+            $PartitionKey = @()
             foreach($attribute in $PartitionKeyAttribute)
             {
                 $PartitionKey+=$DocumentObject."$attribute"
@@ -1068,6 +1070,9 @@ function Set-CosmosDocument
         {
             #to change document Id, you cannot use DocumentObject parameter set
             $Id = $DocumentObject.id
+            #when in pipeline in PS5.1, parameter retains value across invocations
+            $PartitionKey = @()
+
             foreach($attribute in $PartitionKeyAttribute)
             {
                 $PartitionKey+=$DocumentObject."$attribute"
@@ -1080,7 +1085,7 @@ function Set-CosmosDocument
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ETag = $ETag
-        $rq.NoContentOfResponse = $NoContentOnResponse
+        $rq.NoContentOnResponse = $NoContentOnResponse
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
@@ -1201,7 +1206,7 @@ function Update-CosmosDocument
         #PS5.1 does not suppoort Patch method
         $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
         $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
-        $rq.NoContentOfResponse = $NoContentOnResponse.IsPresent
+        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $patches = @{
             operations = $UpdateObject.Updates
         }
@@ -1270,7 +1275,7 @@ function Get-CosmosRequest
             Collection=$Collection
             ETag = $null
             PriorityLevel = $null
-            NoContentOfResponse = $false
+            NoContentOnResponse = $false
         }
     }
 }
@@ -1331,9 +1336,9 @@ function GetCosmosRequestInternal {
                     if($rq.Etag[0] -ne '"') {$headerValue = "`"$($rq.ETag)`""} else {$headerValue = $rq.ETag}
                     $retVal.Headers.IfMatch.Add($headerValue)
                 }
-                if($rq.NoContentOfResponse)
+                if($rq.NoContentOnResponse)
                 {
-                    $retVal.Headers.Add('Prefer', 'return-no-content')
+                    $retVal.Headers.Add('Prefer', 'return=minimal')
                 }
                 break
             }

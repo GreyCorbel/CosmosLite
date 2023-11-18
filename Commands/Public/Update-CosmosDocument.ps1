@@ -35,7 +35,9 @@ function Update-CosmosDocument
             #Name of the collection containing updated document
         $Collection,
 
-        [switch]$NoContentOnResponse,
+        [switch]
+            #asks server not to include updated document in response data
+        $NoContentOnResponse,
 
         [Parameter()]
         [int]
@@ -61,7 +63,7 @@ function Update-CosmosDocument
         #PS5.1 does not suppoort Patch method
         $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
         $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
-        $rq.NoContentOfResponse = $NoContentOnResponse.IsPresent
+        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $patches = @{
             operations = $UpdateObject.Updates
         }

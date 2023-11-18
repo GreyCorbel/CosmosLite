@@ -68,6 +68,10 @@ function New-CosmosDocument
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
 
+        [switch]
+            #asks server not to include created document in response data
+        $NoContentOnResponse,
+
         [Parameter()]
         [int]
             #Degree of paralelism
@@ -111,6 +115,7 @@ function New-CosmosDocument
         $rq.Payload = $Document
         $rq.ETag = $ETag
         $rq.PriorityLevel = $Priority
+        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
