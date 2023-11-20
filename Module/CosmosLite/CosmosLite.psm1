@@ -764,6 +764,10 @@ function New-CosmosDocument
             #Whether to replace existing document with same Id and Partition key
         $IsUpsert,
 
+        [switch]
+            #asks server not to include created document in response data
+        $NoContentOnResponse,
+
         [Parameter()]
         [int]
             #Degree of paralelism
@@ -807,6 +811,7 @@ function New-CosmosDocument
         $rq.Payload = $Document
         $rq.ETag = $ETag
         $rq.PriorityLevel = $Priority
+        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
@@ -1039,7 +1044,9 @@ function Set-CosmosDocument
             #Name of collection containing the document
         $Collection,
 
-        [switch]$NoContentOnResponse,
+        [switch]
+            #asks server not to include replaced document in response data
+        $NoContentOnResponse,
         
         [Parameter()]
         [string]
@@ -1085,7 +1092,7 @@ function Set-CosmosDocument
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.Payload = $Document
         $rq.ETag = $ETag
-        $rq.NoContentOnResponse = $NoContentOnResponse
+        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $rq.ContentType = 'application/json'
 
         $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
@@ -1180,7 +1187,9 @@ function Update-CosmosDocument
             #Name of the collection containing updated document
         $Collection,
 
-        [switch]$NoContentOnResponse,
+        [switch]
+            #asks server not to include updated document in response data
+        $NoContentOnResponse,
 
         [Parameter()]
         [int]
@@ -1365,7 +1374,7 @@ function GetCosmosRequestInternal {
         }
         if($rq.PartitionKey.Count -gt 0)
         {
-            $headerValue = $rq.PartitionKey | ConvertTo-Json
+            $headerValue = $rq.PartitionKey | ConvertTo-Json -Compress
             if($headerValue[0] -ne '[') {$headerValue = "[$headerValue]"}
             $retVal.Headers.Add('x-ms-documentdb-partitionkey', $headerValue)
         }

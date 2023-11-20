@@ -84,7 +84,7 @@ function GetCosmosRequestInternal {
         }
         if($rq.PartitionKey.Count -gt 0)
         {
-            $headerValue = $rq.PartitionKey | ConvertTo-Json
+            $headerValue = $rq.PartitionKey | ConvertTo-Json -Compress
             if($headerValue[0] -ne '[') {$headerValue = "[$headerValue]"}
             $retVal.Headers.Add('x-ms-documentdb-partitionkey', $headerValue)
         }
