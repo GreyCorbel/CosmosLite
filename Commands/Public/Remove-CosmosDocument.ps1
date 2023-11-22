@@ -69,6 +69,7 @@ function Remove-CosmosDocument
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Id = $DocumentObject.id
+            $PartitionKey = @()
             foreach($attribute in $PartitionKeyAttribute)
             {
                 $PartitionKey+=$DocumentObject."$attribute"
