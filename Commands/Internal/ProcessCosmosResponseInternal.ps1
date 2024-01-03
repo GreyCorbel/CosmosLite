@@ -2,13 +2,12 @@ function ProcessCosmosResponseInternal
 {
     [CmdletBinding()]
     param (
+
         [Parameter(Mandatory)]
-        [System.Net.Http.HttpResponseMessage]
-        $rsp,
+        [PSCustomObject]
+        $ResponseContext,
         [Parameter(Mandatory)]
-        [PSTypeName('CosmosLite.Connection')]$Context,
-        [Parameter(Mandatory)]
-        [string]$Collection
+        [PSTypeName('CosmosLite.Connection')]$Context
     )
 
     begin
@@ -17,6 +16,11 @@ function ProcessCosmosResponseInternal
     }
     process
     {
+        #get response associated with request
+        $rsp = $ResponseContext.HttpTask.Result
+        #get collection request was using
+        $collection = $ResponseContext.CosmosLiteRequest.Collection
+        #create return structure
         $retVal=[ordered]@{
             PSTypeName = "CosmosLite.Response"
             IsSuccess = $false
@@ -64,7 +68,7 @@ function ProcessCosmosResponseInternal
         }
         if(-not $retVal['IsSuccess'])
         {
-            $ex = [CosmosLiteException]::new($retVal['Data'].code, $retVal['Data'].message)
+            $ex = [CosmosLiteException]::new($retVal['Data'].code, $retVal['Data'].message, $ResponseContext.CosmosLiteRequest)
             switch($ErrorActionPreference)
             {
                 'Stop' {
@@ -72,7 +76,7 @@ function ProcessCosmosResponseInternal
                     break;
                 }
                 'Continue' {
-                    Write-Error $ex
+                    Write-Error -Exception $ex
                     break;
                 }
             }

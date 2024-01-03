@@ -8,10 +8,16 @@ if($PSEdition -eq 'Desktop')
 
 #region Definitions
 class CosmosLiteException : Exception {
-    [string] $code
+    [string] $Code
+    [PSCustomObject] $Request
 
     CosmosLiteException($Code, $Message) : base($Message) {
         $this.Code = $code
+        $this.Request = $null
+    }
+    CosmosLiteException($Code, $Message, $request) : base($Message) {
+        $this.Code = $code
+        $this.Request = $request
     }
 
     [string] ToString() {
@@ -1387,13 +1393,12 @@ function ProcessCosmosResponseInternal
 {
     [CmdletBinding()]
     param (
+
         [Parameter(Mandatory)]
-        [System.Net.Http.HttpResponseMessage]
-        $rsp,
+        [PSCustomObject]
+        $ResponseContext,
         [Parameter(Mandatory)]
-        [PSTypeName('CosmosLite.Connection')]$Context,
-        [Parameter(Mandatory)]
-        [string]$Collection
+        [PSTypeName('CosmosLite.Connection')]$Context
     )
 
     begin
@@ -1402,6 +1407,11 @@ function ProcessCosmosResponseInternal
     }
     process
     {
+        #get response associated with request
+        $rsp = $ResponseContext.HttpTask.Result
+        #get collection request was using
+        $collection = $ResponseContext.CosmosLiteRequest.Collection
+        #create return structure
         $retVal=[ordered]@{
             PSTypeName = "CosmosLite.Response"
             IsSuccess = $false
@@ -1449,7 +1459,7 @@ function ProcessCosmosResponseInternal
         }
         if(-not $retVal['IsSuccess'])
         {
-            $ex = [CosmosLiteException]::new($retVal['Data'].code, $retVal['Data'].message)
+            $ex = [CosmosLiteException]::new($retVal['Data'].code, $retVal['Data'].message, $ResponseContext.CosmosLiteRequest)
             switch($ErrorActionPreference)
             {
                 'Stop' {
@@ -1504,7 +1514,7 @@ function ProcessRequestBatchInternal
                 $cosmosRequest = $request.CosmosLiteRequest
                 if($httpResponse.IsSuccessStatusCode) {
                     #successful - process response
-                    ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
+                    ProcessCosmosResponseInternal -ResponseContext $request -Context $Context
                 }
                 else
                 {
@@ -1519,7 +1529,7 @@ function ProcessRequestBatchInternal
                     }
                     else {
                         #failed or maxRetries exhausted
-                        ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
+                        ProcessCosmosResponseInternal -CosmosRequest $request -Context $Context
                     }
                 }
                 #dispose httpResponseMessage

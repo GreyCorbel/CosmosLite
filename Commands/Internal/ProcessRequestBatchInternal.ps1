@@ -37,7 +37,7 @@ function ProcessRequestBatchInternal
                 $cosmosRequest = $request.CosmosLiteRequest
                 if($httpResponse.IsSuccessStatusCode) {
                     #successful - process response
-                    ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
+                    ProcessCosmosResponseInternal -ResponseContext $request -Context $Context
                 }
                 else
                 {
@@ -52,7 +52,7 @@ function ProcessRequestBatchInternal
                     }
                     else {
                         #failed or maxRetries exhausted
-                        ProcessCosmosResponseInternal -rsp $httpResponse -Context $Context -Collection $cosmosRequest.Collection
+                        ProcessCosmosResponseInternal -ResponseContext $request -Context $Context
                     }
                 }
                 #dispose httpResponseMessage
