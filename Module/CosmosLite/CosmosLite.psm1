@@ -159,6 +159,9 @@ function Connect-Cosmos
         [Switch]
             #Whether to collect all response headers
         $CollectResponseHeaders,
+        [switch]
+            #Whether to use preview API version
+        $Preview,
 
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
@@ -190,6 +193,7 @@ function Connect-Cosmos
             CollectResponseHeaders = $CollectResponseHeaders
             RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
+            ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
         }
 
         try {
@@ -1292,6 +1296,7 @@ function Get-CosmosRequest
             ETag = $null
             PriorityLevel = $null
             NoContentOnResponse = $false
+            Version = $Context.ApiVersion
         }
     }
 }
@@ -1306,7 +1311,7 @@ function GetCosmosRequestInternal {
         $retVal = New-Object System.Net.Http.HttpRequestMessage
         $retVal.Headers.TryAddWithoutValidation('Authorization', [System.Web.HttpUtility]::UrlEncode("type=aad`&ver=1.0`&sig=$($rq.AccessToken)")) | out-null
         $retVal.Headers.Add('x-ms-date', [DateTime]::UtcNow.ToString('r',[System.Globalization.CultureInfo]::GetCultureInfo('en-US')))
-        $retVal.Headers.Add('x-ms-version', '2018-12-31')
+        $retVal.Headers.Add('x-ms-version', $rq.Version)
         $retVal.RequestUri = $rq.Uri
         $retVal.Method = $rq.Method
         if(-not [string]::IsNullOrEmpty($rq.Session))
@@ -1467,7 +1472,7 @@ function ProcessCosmosResponseInternal
                     break;
                 }
                 'Continue' {
-                    Write-Error $ex
+                    Write-Error -Exception $ex
                     break;
                 }
             }
@@ -1529,7 +1534,7 @@ function ProcessRequestBatchInternal
                     }
                     else {
                         #failed or maxRetries exhausted
-                        ProcessCosmosResponseInternal -CosmosRequest $request -Context $Context
+                        ProcessCosmosResponseInternal -ResponseContext $request -Context $Context
                     }
                 }
                 #dispose httpResponseMessage

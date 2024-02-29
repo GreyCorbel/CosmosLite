@@ -9,7 +9,7 @@ function GetCosmosRequestInternal {
         $retVal = New-Object System.Net.Http.HttpRequestMessage
         $retVal.Headers.TryAddWithoutValidation('Authorization', [System.Web.HttpUtility]::UrlEncode("type=aad`&ver=1.0`&sig=$($rq.AccessToken)")) | out-null
         $retVal.Headers.Add('x-ms-date', [DateTime]::UtcNow.ToString('r',[System.Globalization.CultureInfo]::GetCultureInfo('en-US')))
-        $retVal.Headers.Add('x-ms-version', '2018-12-31')
+        $retVal.Headers.Add('x-ms-version', $rq.Version)
         $retVal.RequestUri = $rq.Uri
         $retVal.Method = $rq.Method
         if(-not [string]::IsNullOrEmpty($rq.Session))

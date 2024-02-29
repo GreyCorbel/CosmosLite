@@ -38,6 +38,7 @@ function Get-CosmosRequest
             ETag = $null
             PriorityLevel = $null
             NoContentOnResponse = $false
+            Version = $Context.ApiVersion
         }
     }
 }

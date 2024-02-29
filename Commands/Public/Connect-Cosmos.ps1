@@ -130,6 +130,9 @@ function Connect-Cosmos
         [Switch]
             #Whether to collect all response headers
         $CollectResponseHeaders,
+        [switch]
+            #Whether to use preview API version
+        $Preview,
 
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
@@ -161,6 +164,7 @@ function Connect-Cosmos
             CollectResponseHeaders = $CollectResponseHeaders
             RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
+            ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
         }
 
         try {
