@@ -274,6 +274,14 @@ if(-not $rslt.IsSuccess)
   }
 }
 ```
+## Preview features
+Module allows usage on non-public features of Cosmos DB REST API via `-Preview` switch of `Connect-Cosmos` command:
+```powershell
+Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydomain.com' -AuthMode Interactive -Preview
+```
+Currently available preview features:
+- support for hiearchical partition keys
+
 
 ## Roadmap
 Feel free to suggest features and functionality extensions.
