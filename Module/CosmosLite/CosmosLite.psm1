@@ -280,6 +280,69 @@ function Get-CosmosAccessToken
         Get-AadToken -Factory $context.AuthFactory -Scopes $context.RequiredScopes
     }
 }
+function Get-CosmosCollectionPartitionKeyRanges
+{
+<#
+.SYNOPSIS
+    Retrieves partition key ranges for the collection
+
+.DESCRIPTION
+    Retrieves partition key ranges for the collection  
+    This helps with execution of cross partition queries
+
+.OUTPUTS
+    Response containing partition key ranges for collection.
+
+.EXAMPLE
+    $rsp = Get-CosmosCollectioPartitionKeyRanges -Collection 'docs'
+    $rsp.data
+
+    Description
+    -----------
+    This command retrieves partition key ranges for collection 'docs'
+#>
+    param
+    (
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [string]
+            #Name of collection conaining the document
+        $Collection,
+
+        [Parameter()]
+        [PSTypeName('CosmosLite.Connection')]
+            #Connection configuration object
+            #Default: connection object produced by most recent call of Connect-Cosmos command
+        $Context = $script:Configuration
+    )
+
+    begin
+    {
+        $url = "$($context.Endpoint)/colls/$collection/pkranges"
+        $outstandingRequests=@()
+    }
+
+    process
+    {
+        $rq = Get-CosmosRequest -Context $Context -Collection $Collection
+        $rq.Uri = new-object System.Uri("$url")
+
+        $rq.Method = [System.Net.Http.HttpMethod]::Get
+
+        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+        if($outstandingRequests.Count -ge $batchSize)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            $outstandingRequests=@()
+        }
+    }
+    end
+    {
+        if($outstandingRequests.Count -gt 0)
+        {
+            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+        }
+    }
+}
 function Get-CosmosConnection
 {
 <#
@@ -447,6 +510,12 @@ function Invoke-CosmosQuery
             #Partition key for partition where query operates. If not specified, query queries all partitions - it's cross-partition query (expensive)
         $PartitionKey,
 
+        [Parameter()]
+        [string[]]
+            #Partition key range id retrieved from Get-CosmosCollectionPartitionKeyRanges command
+            #Helps execution cross-partition queries
+        $PartitionKeyRangeId,
+
         [Parameter(Mandatory)]
         [string]
             #Name of the collection
@@ -486,6 +555,7 @@ function Invoke-CosmosQuery
         {
             $rq = Get-CosmosRequest `
                 -PartitionKey $partitionKey `
+                -PartitionKeyRangeId $PartitionKeyRangeId `
                 -Type Query `
                 -MaxItems $MaxItems `
                 -Continuation $ContinuationToken `
@@ -1266,6 +1336,8 @@ function Get-CosmosRequest
         [string]$Continuation,
         [Parameter()]
         [string[]]$PartitionKey,
+        [Parameter()]
+        [string[]]$PartitionKeyRangeId,
         [Parameter(Mandatory)]
         [string]$Collection,
         [Parameter()]
@@ -1287,6 +1359,7 @@ function Get-CosmosRequest
             Session = $Context.Session[$Collection]
             Upsert = $Upsert
             PartitionKey = $PartitionKey
+            PartitionKeyRangeId = $PartitionKeyRangeId
             Method = $null
             Uri = $null
             Payload = $null
@@ -1345,6 +1418,11 @@ function GetCosmosRequestInternal {
                 {
                     #Write-Verbose "Setting 'x-ms-continuation' to $($rq.Continuation)"
                     $retVal.Headers.Add('x-ms-continuation', $rq.Continuation)
+                }
+                if(-not [string]::IsNullOrEmpty($rq.PartitionKeyRangeId))
+                {
+                    #Write-Verbose "Setting 'x-ms-documentdb-partitionkeyrangeid' to $($rq.PartitionKeyRangeId)"
+                    $retVal.Headers.Add('x-ms-documentdb-partitionkeyrangeid', $rq.PartitionKeyRangeId)
                 }
                 break;
             }

@@ -44,6 +44,11 @@ function GetCosmosRequestInternal {
                     #Write-Verbose "Setting 'x-ms-continuation' to $($rq.Continuation)"
                     $retVal.Headers.Add('x-ms-continuation', $rq.Continuation)
                 }
+                if(-not [string]::IsNullOrEmpty($rq.PartitionKeyRangeId))
+                {
+                    #Write-Verbose "Setting 'x-ms-documentdb-partitionkeyrangeid' to $($rq.PartitionKeyRangeId)"
+                    $retVal.Headers.Add('x-ms-documentdb-partitionkeyrangeid', $rq.PartitionKeyRangeId)
+                }
                 break;
             }
             {$_ -in 'SpCall','Document'} {

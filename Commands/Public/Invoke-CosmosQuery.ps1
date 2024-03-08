@@ -52,6 +52,12 @@ function Invoke-CosmosQuery
             #Partition key for partition where query operates. If not specified, query queries all partitions - it's cross-partition query (expensive)
         $PartitionKey,
 
+        [Parameter()]
+        [string[]]
+            #Partition key range id retrieved from Get-CosmosCollectionPartitionKeyRanges command
+            #Helps execution cross-partition queries
+        $PartitionKeyRangeId,
+
         [Parameter(Mandatory)]
         [string]
             #Name of the collection
@@ -91,6 +97,7 @@ function Invoke-CosmosQuery
         {
             $rq = Get-CosmosRequest `
                 -PartitionKey $partitionKey `
+                -PartitionKeyRangeId $PartitionKeyRangeId `
                 -Type Query `
                 -MaxItems $MaxItems `
                 -Continuation $ContinuationToken `

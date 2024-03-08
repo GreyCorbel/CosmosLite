@@ -8,6 +8,8 @@ function Get-CosmosRequest
         [string]$Continuation,
         [Parameter()]
         [string[]]$PartitionKey,
+        [Parameter()]
+        [string[]]$PartitionKeyRangeId,
         [Parameter(Mandatory)]
         [string]$Collection,
         [Parameter()]
@@ -29,6 +31,7 @@ function Get-CosmosRequest
             Session = $Context.Session[$Collection]
             Upsert = $Upsert
             PartitionKey = $PartitionKey
+            PartitionKeyRangeId = $PartitionKeyRangeId
             Method = $null
             Uri = $null
             Payload = $null
