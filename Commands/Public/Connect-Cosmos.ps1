@@ -154,7 +154,6 @@ function Connect-Cosmos
             [system.net.webrequest]::defaultwebproxy = $Proxy
         }
 
-        $script:httpClient = new-object System.Net.Http.HttpClient
         $script:Configuration = [PSCustomObject]@{
             PSTypeName = "CosmosLite.Connection"
             AccountName = $AccountName
@@ -165,6 +164,7 @@ function Connect-Cosmos
             RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
             ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
+            HttpClient = new-object System.Net.Http.HttpClient
         }
 
         try {

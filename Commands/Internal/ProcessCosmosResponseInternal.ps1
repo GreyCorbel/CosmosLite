@@ -52,7 +52,23 @@ function ProcessCosmosResponseInternal
         {
             $retVal['Headers']=@{}
             $rsp.Headers.ForEach{
-                $retVal['Headers']["$($_.Key)"] = $_.Value
+                $header = $_
+                switch($header.Key)
+                {
+                    'x-ms-documentdb-query-metrics' {
+                        $retVal['Headers']["$($header.Key)"] = $header.Value[0].Split(';')
+                        break
+                    }
+                    'x-ms-cosmos-index-utilization' {
+                        $iu = $header.Value[0]
+                        $retVal['Headers']["$($header.Key)"] = [system.text.encoding]::UTF8.GetString([Convert]::FromBase64String($iu)) | ConvertFrom-Json
+                        break
+                    }
+                    default {
+                        $retVal['Headers']["$($header.Key)"] = $header.Value
+                        break
+                    }
+                }
             }
         }
         #retrieve response data

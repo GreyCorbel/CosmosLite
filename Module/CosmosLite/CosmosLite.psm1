@@ -183,7 +183,6 @@ function Connect-Cosmos
             [system.net.webrequest]::defaultwebproxy = $Proxy
         }
 
-        $script:httpClient = new-object System.Net.Http.HttpClient
         $script:Configuration = [PSCustomObject]@{
             PSTypeName = "CosmosLite.Connection"
             AccountName = $AccountName
@@ -194,6 +193,7 @@ function Connect-Cosmos
             RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
             ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
+            HttpClient = new-object System.Net.Http.HttpClient
         }
 
         try {
@@ -533,6 +533,10 @@ function Invoke-CosmosQuery
         $ContinuationToken,
 
         [switch]
+            #Populates query metrics in response object
+        $PopulateMetrics,
+
+        [switch]
             #when response contains continuation token, returns the reesponse and automatically sends new request with continuation token
             #this simnlifies getting all data from query for large datasets
         $AutoContinue,
@@ -559,6 +563,7 @@ function Invoke-CosmosQuery
                 -Type Query `
                 -MaxItems $MaxItems `
                 -Continuation $ContinuationToken `
+                -PopulateMetrics:$PopulateMetrics `
                 -Context $Context `
                 -Collection $Collection
 
@@ -1343,6 +1348,7 @@ function Get-CosmosRequest
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
+        [switch]$PopulateMetrics,
         [Parameter()]
         [PSTypeName('CosmosLite.Connection')]$Context = $script:Configuration
     )
@@ -1368,6 +1374,7 @@ function Get-CosmosRequest
             Collection=$Collection
             ETag = $null
             PriorityLevel = $null
+            PopulateMetrics = $PopulateMetrics
             NoContentOnResponse = $false
             Version = $Context.ApiVersion
         }
@@ -1424,7 +1431,13 @@ function GetCosmosRequestInternal {
                     #Write-Verbose "Setting 'x-ms-documentdb-partitionkeyrangeid' to $($rq.PartitionKeyRangeId)"
                     $retVal.Headers.Add('x-ms-documentdb-partitionkeyrangeid', $rq.PartitionKeyRangeId)
                 }
-                break;
+                if($rq.PopulateMetrics)
+                {
+                    #Write-Verbose "Setting 'x-ms-documentdb-populatequerymetrics' to True"
+                    $retVal.Headers.Add('x-ms-documentdb-populatequerymetrics', 'True')
+                    $retVal.Headers.Add('x-ms-cosmos-populateindexmetrics', 'True')
+                }
+               break;
             }
             {$_ -in 'SpCall','Document'} {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)
@@ -1526,7 +1539,23 @@ function ProcessCosmosResponseInternal
         {
             $retVal['Headers']=@{}
             $rsp.Headers.ForEach{
-                $retVal['Headers']["$($_.Key)"] = $_.Value
+                $header = $_
+                switch($header.Key)
+                {
+                    'x-ms-documentdb-query-metrics' {
+                        $retVal['Headers']["$($header.Key)"] = $header.Value[0].Split(';')
+                        break
+                    }
+                    'x-ms-cosmos-index-utilization' {
+                        $iu = $header.Value[0]
+                        $retVal['Headers']["$($header.Key)"] = [system.text.encoding]::UTF8.GetString([Convert]::FromBase64String($iu)) | ConvertFrom-Json
+                        break
+                    }
+                    default {
+                        $retVal['Headers']["$($header.Key)"] = $header.Value
+                        break
+                    }
+                }
             }
         }
         #retrieve response data
@@ -1655,7 +1684,7 @@ function SendRequestInternal
         [PSCustomObject]@{
             CosmosLiteRequest = $rq
             HttpRequest = $httpRequest
-            HttpTask = $script:httpClient.SendAsync($httpRequest)
+            HttpTask = $Context.HttpClient.SendAsync($httpRequest)
         }
     }
 }

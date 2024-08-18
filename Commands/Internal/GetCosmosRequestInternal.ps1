@@ -49,7 +49,13 @@ function GetCosmosRequestInternal {
                     #Write-Verbose "Setting 'x-ms-documentdb-partitionkeyrangeid' to $($rq.PartitionKeyRangeId)"
                     $retVal.Headers.Add('x-ms-documentdb-partitionkeyrangeid', $rq.PartitionKeyRangeId)
                 }
-                break;
+                if($rq.PopulateMetrics)
+                {
+                    #Write-Verbose "Setting 'x-ms-documentdb-populatequerymetrics' to True"
+                    $retVal.Headers.Add('x-ms-documentdb-populatequerymetrics', 'True')
+                    $retVal.Headers.Add('x-ms-cosmos-populateindexmetrics', 'True')
+                }
+               break;
             }
             {$_ -in 'SpCall','Document'} {
                 $retVal.Content = new-object System.Net.Http.StringContent($rq.payload,$null ,$rq.ContentType)

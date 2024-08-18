@@ -75,6 +75,10 @@ function Invoke-CosmosQuery
         $ContinuationToken,
 
         [switch]
+            #Populates query metrics in response object
+        $PopulateMetrics,
+
+        [switch]
             #when response contains continuation token, returns the reesponse and automatically sends new request with continuation token
             #this simnlifies getting all data from query for large datasets
         $AutoContinue,
@@ -101,6 +105,7 @@ function Invoke-CosmosQuery
                 -Type Query `
                 -MaxItems $MaxItems `
                 -Continuation $ContinuationToken `
+                -PopulateMetrics:$PopulateMetrics `
                 -Context $Context `
                 -Collection $Collection
 

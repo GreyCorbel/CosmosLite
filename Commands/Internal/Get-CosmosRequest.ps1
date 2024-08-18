@@ -15,6 +15,7 @@ function Get-CosmosRequest
         [Parameter()]
         [ValidateSet('Query','SpCall','Document','Other')]
         [string]$Type = 'Other',
+        [switch]$PopulateMetrics,
         [Parameter()]
         [PSTypeName('CosmosLite.Connection')]$Context = $script:Configuration
     )
@@ -40,6 +41,7 @@ function Get-CosmosRequest
             Collection=$Collection
             ETag = $null
             PriorityLevel = $null
+            PopulateMetrics = $PopulateMetrics
             NoContentOnResponse = $false
             Version = $Context.ApiVersion
         }

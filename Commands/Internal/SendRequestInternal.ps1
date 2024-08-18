@@ -15,7 +15,7 @@ function SendRequestInternal
         [PSCustomObject]@{
             CosmosLiteRequest = $rq
             HttpRequest = $httpRequest
-            HttpTask = $script:httpClient.SendAsync($httpRequest)
+            HttpTask = $Context.HttpClient.SendAsync($httpRequest)
         }
     }
 }
