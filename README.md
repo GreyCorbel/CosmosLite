@@ -192,7 +192,7 @@ $queryParams=@{
 }
 do
 {
-  $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParameters -PartitionKey 'sample-docs' -ContinuationToken $rslt.Continuation
+  $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParameters -PartitionKey 'sample-docs' -Collection test -ContinuationToken $rslt.Continuation
   if($rslt.IsSuccess)
   {
     $rslt.Data.Documents | Foreach-Object{
@@ -273,6 +273,20 @@ if(-not $rslt.IsSuccess)
     throw $rsp.Data
   }
 }
+```
+### Query disgnostics
+Since version 3.0.7, module allows collection of query and index usage diagnostics for queries. Diagnostics collection works using response headers collection (parameter `CollectResponseHeaders`) and `PopulateMetrics` switch on `Invoke-CosmosQuery` command as shown below. Diagnostic data help fine tutnic queries and their parameters.
+```powershell
+Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydomain.com' -AuthMode Interactive -CollectResponseHeaders
+$query = "select * from c where c.partitionKey = @pk"
+$queryParams=@{
+  '@pk' = 'sample-docs'
+}
+$rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParameters -Collection test -PopulateMetrics
+#show index usage diagbostic data
+$rslt.headers['x-ms-cosmos-index-utilization']
+#show query disgnostic data
+$rslt.headers['x-ms-documentdb-query-metrics']
 ```
 ## Preview features
 Module allows usage on non-public features of Cosmos DB REST API via `-Preview` switch of `Connect-Cosmos` command:
