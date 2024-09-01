@@ -68,7 +68,7 @@ jobs:
 
     - name: Publish
       #Publish to PS Gallery
-      if: ${{ github.event_name != 'workflow_dispatch' }}
+      if: ${{ (github.event_name != 'workflow_dispatch') || github.event.inputs.publish }}
       shell: pwsh
       env:
         SECRET: ${{ secrets.PSGallery_APIKey }}
