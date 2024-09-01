@@ -8,6 +8,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      publish:
+        type: boolean
+        description: 'Publish to powershell gallery'     
+        required: false
+        default: false
 
 jobs:
   # This workflow contains a single job called "publishToGallery"
@@ -74,7 +80,7 @@ jobs:
           $env:PSModulePath = "$env:PSModulePath;$env:GITHUB_WORKSPACE\Module"
           "PSModulePath: $env:PSModulePath"
 
-          Publish-Module -Path "$env:GITHUB_WORKSPACE\Module\CosmosLite" -NuGetApiKey "$env:SECRET"
+          Publish-PSResource -Path "$env:GITHUB_WORKSPACE\Module\CosmosLite" -Repository PSGallery -APIKey "$env:SECRET"
         }
         catch
         {
