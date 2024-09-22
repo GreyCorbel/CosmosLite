@@ -27,7 +27,7 @@ function GetCosmosRequestInternal {
                 $retVal.Headers.Add('x-ms-documentdb-isquery', 'True')
 
                 #avoid RequestTooLarge error because of continuation token size
-                $retVal.Headers.Add('x-ms-documentdb-responsecontinuationtokenlimitinkb', '8')
+                $retVal.Headers.Add('x-ms-documentdb-responsecontinuationtokenlimitinkb', "$($rq.MaxContinuationTokenSizeInKb)")
 
                 if($null -ne $rq.MaxItems)
                 {

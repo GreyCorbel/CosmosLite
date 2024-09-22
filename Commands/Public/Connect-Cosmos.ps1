@@ -144,7 +144,12 @@ function Connect-Cosmos
         [Parameter()]
         [int]
             #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
-        $RetryCount = 10
+        $RetryCount = 10,
+        [Parameter()]
+        [int]
+            #Maximum continuation token size in KB
+        $MaxContinuationTokenSizeInKb = 6
+
     )
 
     process
@@ -165,6 +170,7 @@ function Connect-Cosmos
             AuthFactory = $null
             ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
             HttpClient = new-object System.Net.Http.HttpClient
+            MaxContinuationTokenSizeInKb = $MaxContinuationTokenSizeInKb
         }
 
         try {

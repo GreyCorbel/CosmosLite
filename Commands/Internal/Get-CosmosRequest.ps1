@@ -7,6 +7,8 @@ function Get-CosmosRequest
         [Parameter()]
         [string]$Continuation,
         [Parameter()]
+        [int]$MaxContinuationTokenSizeInKb = 6,
+        [Parameter()]
         [string[]]$PartitionKey,
         [Parameter()]
         [string[]]$PartitionKeyRangeId,
@@ -29,6 +31,7 @@ function Get-CosmosRequest
             Type = $Type
             MaxItems = $MaxItems
             Continuation = $Continuation
+            MaxContinuationTokenSizeInKb = $Context.MaxContinuationTokenSizeInKb
             Session = $Context.Session[$Collection]
             Upsert = $Upsert
             PartitionKey = $PartitionKey
