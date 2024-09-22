@@ -274,7 +274,7 @@ if(-not $rslt.IsSuccess)
   }
 }
 ```
-### Query disgnostics
+### Query diagnostics
 Since version 3.0.7, module allows collection of query and index usage diagnostics for queries. Diagnostics collection works using response headers collection (parameter `CollectResponseHeaders`) and `PopulateMetrics` switch on `Invoke-CosmosQuery` command as shown below. Diagnostic data help fine tutnic queries and their parameters.
 ```powershell
 Connect-Cosmos -AccountName 'test-acct' -Database 'test' -TenantId 'mydomain.com' -AuthMode Interactive -CollectResponseHeaders
