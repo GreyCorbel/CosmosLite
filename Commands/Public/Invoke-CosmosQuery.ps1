@@ -70,6 +70,12 @@ function Invoke-CosmosQuery
         $MaxItems,
 
         [Parameter()]
+            #Custom type to serialize documents returned by query to
+            #When specified, custom serializer is used and returns objects of specified type
+            #When not specified, ConvertFrom-Json command is used that returns documents as PSCustomObject
+        [Type]$TargetType,
+
+        [Parameter()]
         [string]
             #Continuation token. Used to ask for next page of results
         $ContinuationToken,
@@ -97,6 +103,15 @@ function Invoke-CosmosQuery
 
     process
     {
+        #create custom type for response
+        $expression = "class QueryResponse {
+            [string]`$_rid
+            [int]`$_count
+            [System.Collections.Generic.List[$($targetType.Name)]]`$Documents
+            }"
+        Invoke-Expression $expression
+        $Type = [QueryResponse]
+
         do
         {
             $rq = Get-CosmosRequest `
@@ -107,7 +122,8 @@ function Invoke-CosmosQuery
                 -Continuation $ContinuationToken `
                 -PopulateMetrics:$PopulateMetrics `
                 -Context $Context `
-                -Collection $Collection
+                -Collection $Collection `
+                -TargetType $Type
 
             $QueryDefinition = @{
                 query = $Query

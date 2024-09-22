@@ -76,7 +76,7 @@ function ProcessCosmosResponseInternal
         {
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
             try {
-                $retVal['Data'] = ($s | ConvertFrom-Json -ErrorAction Stop)
+                $retVal['Data'] = ($s | GetResponseData -TargetType $ResponseContext.CosmosLiteRequest.TargetType  -ErrorAction Stop)
             }
             catch {
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")

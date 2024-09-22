@@ -37,6 +37,12 @@ function Get-CosmosDocument
         $Collection,
 
         [Parameter()]
+        #Custom type to serialize documents returned by query to
+        #When specified, custom serializer is used and returns objects of specified type
+        #When not specified, ConvertFrom-Json command is used that returns documents as PSCustomObject
+        [Type]$TargetType,
+
+        [Parameter()]
         [string]
             #ETag to check. Document is retrieved only if server version of document has different ETag
         $Etag,
@@ -69,7 +75,7 @@ function Get-CosmosDocument
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection -TargetType $TargetType
         $rq.Method = [System.Net.Http.HttpMethod]::Get
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.ETag = $ETag

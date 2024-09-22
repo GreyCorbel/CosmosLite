@@ -3,6 +3,19 @@
 if($PSEdition -eq 'Desktop')
 {
     add-type -AssemblyName system.web
+    $script:DesktopSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
+    $script:DesktopSerializer.MaxJsonLength = [int]::MaxValue
+    $script:DesktopSerializer.RecursionLimit = 100
+}
+else {
+    add-type -AssemblyName System.Text.Json
+    $Script:JsonSerializerOptions = [System.Text.Json.JsonSerializerOptions]@{
+        PropertyNameCaseInsensitive = $true
+        PropertyNamingPolicy = [System.Text.Json.JsonNamingPolicy]::CamelCase
+        ReadCommentHandling = [System.Text.Json.JsonCommentHandling]::Skip
+        AllowTrailingCommas = $true
+        MaxDepth = 100
+    }
 }
 #endregion Initialization
 
@@ -173,7 +186,12 @@ function Connect-Cosmos
         [Parameter()]
         [int]
             #Max number of retries when server returns http error 429 (TooManyRequests) before returning this error to caller
-        $RetryCount = 10
+        $RetryCount = 10,
+        [Parameter()]
+        [int]
+            #Maximum continuation token size in KB
+        $MaxContinuationTokenSizeInKb = 6
+
     )
 
     process
@@ -194,6 +212,7 @@ function Connect-Cosmos
             AuthFactory = $null
             ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
             HttpClient = new-object System.Net.Http.HttpClient
+            MaxContinuationTokenSizeInKb = $MaxContinuationTokenSizeInKb
         }
 
         try {
@@ -403,6 +422,12 @@ function Get-CosmosDocument
         $Collection,
 
         [Parameter()]
+        #Custom type to serialize documents returned by query to
+        #When specified, custom serializer is used and returns objects of specified type
+        #When not specified, ConvertFrom-Json command is used that returns documents as PSCustomObject
+        [Type]$TargetType,
+
+        [Parameter()]
         [string]
             #ETag to check. Document is retrieved only if server version of document has different ETag
         $Etag,
@@ -435,7 +460,7 @@ function Get-CosmosDocument
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
+        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection -TargetType $TargetType
         $rq.Method = [System.Net.Http.HttpMethod]::Get
         $rq.Uri = new-object System.Uri("$url/$id")
         $rq.ETag = $ETag
@@ -528,6 +553,12 @@ function Invoke-CosmosQuery
         $MaxItems,
 
         [Parameter()]
+            #Custom type to serialize documents returned by query to
+            #When specified, custom serializer is used and returns objects of specified type
+            #When not specified, ConvertFrom-Json command is used that returns documents as PSCustomObject
+        [Type]$TargetType,
+
+        [Parameter()]
         [string]
             #Continuation token. Used to ask for next page of results
         $ContinuationToken,
@@ -555,6 +586,15 @@ function Invoke-CosmosQuery
 
     process
     {
+        #create custom type for response
+        $expression = "class QueryResponse {
+            [string]`$_rid
+            [int]`$_count
+            [System.Collections.Generic.List[$($targetType.Name)]]`$Documents
+            }"
+        Invoke-Expression $expression
+        $Type = [QueryResponse]
+
         do
         {
             $rq = Get-CosmosRequest `
@@ -565,7 +605,8 @@ function Invoke-CosmosQuery
                 -Continuation $ContinuationToken `
                 -PopulateMetrics:$PopulateMetrics `
                 -Context $Context `
-                -Collection $Collection
+                -Collection $Collection `
+                -TargetType $Type
 
             $QueryDefinition = @{
                 query = $Query
@@ -1338,7 +1379,11 @@ function Get-CosmosRequest
         [Parameter()]
         [NUllable[UInt32]]$MaxItems,
         [Parameter()]
+        [Type]$TargetType,
+        [Parameter()]
         [string]$Continuation,
+        [Parameter()]
+        [int]$MaxContinuationTokenSizeInKb = 6,
         [Parameter()]
         [string[]]$PartitionKey,
         [Parameter()]
@@ -1356,12 +1401,14 @@ function Get-CosmosRequest
     process
     {
         $token = Get-CosmosAccessToken -Context $context
-        
+ 
         [PSCustomObject]@{
             AccessToken = $token.AccessToken
             Type = $Type
+            TargetType = $TargetType
             MaxItems = $MaxItems
             Continuation = $Continuation
+            MaxContinuationTokenSizeInKb = $Context.MaxContinuationTokenSizeInKb
             Session = $Context.Session[$Collection]
             Upsert = $Upsert
             PartitionKey = $PartitionKey
@@ -1409,7 +1456,7 @@ function GetCosmosRequestInternal {
                 $retVal.Headers.Add('x-ms-documentdb-isquery', 'True')
 
                 #avoid RequestTooLarge error because of continuation token size
-                $retVal.Headers.Add('x-ms-documentdb-responsecontinuationtokenlimitinkb', '8')
+                $retVal.Headers.Add('x-ms-documentdb-responsecontinuationtokenlimitinkb', "$($rq.MaxContinuationTokenSizeInKb)")
 
                 if($null -ne $rq.MaxItems)
                 {
@@ -1483,6 +1530,36 @@ function GetCosmosRequestInternal {
         }
 
         $retVal
+    }
+}
+function GetResponseData
+{
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [string]$Payload,
+        [Parameter()]
+        [Type]$TargetType
+    )
+
+    process
+    {
+        if($null -eq $TargetType)
+        {
+            $Payload | ConvertFrom-Json
+        }
+        else {
+            switch($PSVersionTable.PSEdition)
+            {
+                'Desktop' 
+                {
+                    $script:DesktopSerializer.Deserialize($Payload, $TargetType)
+                }
+                'Core' 
+                {
+                    [System.Text.Json.JsonSerializer]::Deserialize($Payload, $TargetType, $Script:JsonSerializerOptions)
+                }
+            }
+        }
     }
 }
 function ProcessCosmosResponseInternal
@@ -1563,7 +1640,7 @@ function ProcessCosmosResponseInternal
         {
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
             try {
-                $retVal['Data'] = ($s | ConvertFrom-Json -ErrorAction Stop)
+                $retVal['Data'] = ($s | GetResponseData -TargetType $ResponseContext.CosmosLiteRequest.TargetType  -ErrorAction Stop)
             }
             catch {
                 throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")

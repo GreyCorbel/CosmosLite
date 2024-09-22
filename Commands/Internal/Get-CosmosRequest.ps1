@@ -5,6 +5,8 @@ function Get-CosmosRequest
         [Parameter()]
         [NUllable[UInt32]]$MaxItems,
         [Parameter()]
+        [Type]$TargetType,
+        [Parameter()]
         [string]$Continuation,
         [Parameter()]
         [int]$MaxContinuationTokenSizeInKb = 6,
@@ -25,10 +27,11 @@ function Get-CosmosRequest
     process
     {
         $token = Get-CosmosAccessToken -Context $context
-        
+ 
         [PSCustomObject]@{
             AccessToken = $token.AccessToken
             Type = $Type
+            TargetType = $TargetType
             MaxItems = $MaxItems
             Continuation = $Continuation
             MaxContinuationTokenSizeInKb = $Context.MaxContinuationTokenSizeInKb
