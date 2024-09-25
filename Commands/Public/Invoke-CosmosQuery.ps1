@@ -103,14 +103,18 @@ function Invoke-CosmosQuery
 
     process
     {
-        #create custom type for response
-        $expression = "class QueryResponse {
-            [string]`$_rid
-            [int]`$_count
-            [System.Collections.Generic.List[$($targetType.Name)]]`$Documents
-            }"
-        Invoke-Expression $expression
-        $Type = [QueryResponse]
+        if($null -ne $TargetType)
+        {
+            #create custom type for response
+            $expression = "class QueryResponse {
+                [string]`$_rid
+                [int]`$_count
+                [System.Collections.Generic.List[$($targetType.Name)]]`$Documents
+                }"
+            Invoke-Expression $expression
+            $Type = [QueryResponse]
+        }
+        else {$Type=$null}
 
         do
         {

@@ -2,12 +2,14 @@
 #region Initialization
 if($PSEdition -eq 'Desktop')
 {
+    add-type -AssemblyName System.Collections
     add-type -AssemblyName system.web
     $script:DesktopSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
     $script:DesktopSerializer.MaxJsonLength = [int]::MaxValue
     $script:DesktopSerializer.RecursionLimit = 100
 }
 else {
+    add-type -AssemblyName System.Collections
     add-type -AssemblyName System.Text.Json
     $Script:JsonSerializerOptions = [System.Text.Json.JsonSerializerOptions]@{
         PropertyNameCaseInsensitive = $true
@@ -586,14 +588,18 @@ function Invoke-CosmosQuery
 
     process
     {
-        #create custom type for response
-        $expression = "class QueryResponse {
-            [string]`$_rid
-            [int]`$_count
-            [System.Collections.Generic.List[$($targetType.Name)]]`$Documents
-            }"
-        Invoke-Expression $expression
-        $Type = [QueryResponse]
+        if($null -ne $TargetType)
+        {
+            #create custom type for response
+            $expression = "class QueryResponse {
+                [string]`$_rid
+                [int]`$_count
+                [System.Collections.Generic.List[$($targetType.Name)]]`$Documents
+                }"
+            Invoke-Expression $expression
+            $Type = [QueryResponse]
+        }
+        else {$Type=$null}
 
         do
         {
