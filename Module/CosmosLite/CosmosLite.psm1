@@ -4,6 +4,7 @@ if($PSEdition -eq 'Desktop')
 {
     add-type -AssemblyName System.Collections
     add-type -AssemblyName system.web
+    add-type -AssemblyName System.Web.Extensions
     $script:DesktopSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
     $script:DesktopSerializer.MaxJsonLength = [int]::MaxValue
     $script:DesktopSerializer.RecursionLimit = 100
@@ -192,6 +193,8 @@ function Connect-Cosmos
         [Parameter()]
         [int]
             #Maximum continuation token size in KB
+            #Default: 6KB
+            #Decrease when experiencing error 'Request too large'
         $MaxContinuationTokenSizeInKb = 6
 
     )
@@ -1642,14 +1645,18 @@ function ProcessCosmosResponseInternal
             }
         }
         #retrieve response data
-        if($null -ne $rsp.Content)
+        if($null -ne $rsp.Content -and $rsp.StatusCode -ne [System.Net.HttpStatusCode]::NoContent)
         {
+            #we expect to receive some payload
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            try {
-                $retVal['Data'] = ($s | GetResponseData -TargetType $ResponseContext.CosmosLiteRequest.TargetType  -ErrorAction Stop)
-            }
-            catch {
-                throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
+            if(-not [string]::IsNullOrWhiteSpace($s))
+            {
+                try {
+                    $retVal['Data'] = ($s | GetResponseData -TargetType $ResponseContext.CosmosLiteRequest.TargetType  -ErrorAction Stop)
+                }
+                catch {
+                    throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
+                }
             }
         }
         if(-not $retVal['IsSuccess'])
