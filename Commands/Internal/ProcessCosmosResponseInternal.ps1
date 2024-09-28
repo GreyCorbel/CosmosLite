@@ -72,14 +72,18 @@ function ProcessCosmosResponseInternal
             }
         }
         #retrieve response data
-        if($null -ne $rsp.Content)
+        if($null -ne $rsp.Content -and $rsp.StatusCode -ne [System.Net.HttpStatusCode]::NoContent)
         {
+            #we expect to receive some payload
             $s = $rsp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            try {
-                $retVal['Data'] = ($s | GetResponseData -TargetType $ResponseContext.CosmosLiteRequest.TargetType  -ErrorAction Stop)
-            }
-            catch {
-                throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
+            if(-not [string]::IsNullOrWhiteSpace($s))
+            {
+                try {
+                    $retVal['Data'] = ($s | GetResponseData -TargetType $ResponseContext.CosmosLiteRequest.TargetType  -ErrorAction Stop)
+                }
+                catch {
+                    throw new-object System.FormatException("InvalidJsonPayloadReceived. Error: $($_.Exception.Message)`nPayload: $s")
+                }
             }
         }
         if(-not $retVal['IsSuccess'])
