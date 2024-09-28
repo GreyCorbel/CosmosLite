@@ -288,6 +288,69 @@ $rslt.headers['x-ms-cosmos-index-utilization']
 #show query disgnostic data
 $rslt.headers['x-ms-documentdb-query-metrics']
 ```
+
+### Strongly typed documents
+Module allows usage of strongly typed documents, represented by compiled C# class or PowerShell class. This may be useful e.g. for performance critical scenarios when working with documents in C# code.  
+Custom type to serialize to is identified by -TargetType paremeter on commands that support custom types. When target type specified, custom Json serializer is also used to reserialize payload returned by database:
+- in Desktop edition, System.Web.Script.Serialization.JavaScriptSerializer is used
+- in Core edition, System.Text.Json.JsonSerializer is used
+
+When custom type is not specified, ConvertFrom-Json command is used to deserialize data returned by database.  
+
+Example below shows how to effectively compare large datasets and find documents present in both datasets.
+```powershell
+add-Type -typedefinition @'
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+public class UpnUser:IEquatable<UpnUser>
+{
+    public string id { get; set; }
+    public string pk { get; set; }
+    public string upn { get; set; }
+
+    public bool Equals(UpnUser other)
+    {
+        if (other == null) return false;
+        return (this.upn.Equals(other.upn));
+    }
+    public override bool Equals(object obj)
+    {
+        return Equals(obj as UpnUser);
+    }
+
+    public override int GetHashCode()
+    {
+        return upn.GetHashCode();
+    }
+}
+
+public static class Helper
+{
+    public static T[] FindDuplicates<T>(IEnumerable<T> source1, IEnumerable<T> source2)
+    {
+        return source1.Intersect(source2).ToArray();
+    }
+}
+'@
+
+$query = 'select c.id, c.pk, c.upn from c'
+#query the DB and specify we want deserialize to custom object type
+$rslt = invoke-CosmosQuery -Collection SourceData -Query $query -AutoContinue -TargetType ([UpnUser])
+$source = new-object System.Collections.Generic.List[UpnUser]
+#Autocontinue returns multiple responses, each with own set of returned documents - we cíombine them to single list
+$rslt | foreach-object{$source.AddRange($_.data.documents)}
+#query the DB and specify custom type again, and combine results to single list
+$rslt = invoke-CosmosQuery -Collection DataToCompare -Query $query -AutoContinue -TargetType ([UpnUser]) 
+$toCompateWith = new-object System.Collections.Generic.List[UpnUser]
+$rslt |foreach-object{$toCompateWith.AddRange($_.data.documents)}
+#duplicates contain documents from $source that are also present in $toCompareWith. Duplicates found by .Net Linq, which provides great performance compared to possible equivalents in Powershell
+$duplicates = [helper]::FindDuplicates($source,$toCompareWith)
+
+```
+
+
 ## Preview features
 Module allows usage on non-public features of Cosmos DB REST API via `-Preview` switch of `Connect-Cosmos` command:
 ```powershell

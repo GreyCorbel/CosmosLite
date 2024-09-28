@@ -148,6 +148,8 @@ function Connect-Cosmos
         [Parameter()]
         [int]
             #Maximum continuation token size in KB
+            #Default: 6KB
+            #Decrease when experiencing error 'Request too large'
         $MaxContinuationTokenSizeInKb = 6
 
     )
