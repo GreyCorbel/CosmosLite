@@ -2,6 +2,7 @@ if($PSEdition -eq 'Desktop')
 {
     add-type -AssemblyName System.Collections
     add-type -AssemblyName system.web
+    add-type -AssemblyName System.Web.Extensions
     $script:DesktopSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
     $script:DesktopSerializer.MaxJsonLength = [int]::MaxValue
     $script:DesktopSerializer.RecursionLimit = 100
