@@ -123,8 +123,8 @@ Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -Use
 #connect Cosmos with User assigned Managed Identity
 Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
 
-#connect Cosmos with User assigned Managed Identity and collect server response headers
-Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity -CollectResponseHeaders
+#connect Cosmos with User assigned Managed Identity and limited max size of continuation token, and collect server response headers
+Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity -CollectResponseHeaders -MaxContinuationTokenSizeInKb 4
 
 ```
 ### Working with documents
