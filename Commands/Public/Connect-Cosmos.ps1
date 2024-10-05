@@ -151,7 +151,6 @@ function Connect-Cosmos
             #Default: 6KB
             #Decrease when experiencing error 'Request too large'
         $MaxContinuationTokenSizeInKb = 6
-
     )
 
     process
