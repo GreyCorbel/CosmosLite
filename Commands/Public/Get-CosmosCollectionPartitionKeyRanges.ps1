@@ -12,12 +12,14 @@ function Get-CosmosCollectionPartitionKeyRanges
     Response containing partition key ranges for collection.
 
 .EXAMPLE
-    $rsp = Get-CosmosCollectioPartitionKeyRanges -Collection 'docs'
-    $rsp.data
+    $rsp = Get-CosmosCollectioPartitionKeyRanges -Collection veryLargeCollection
+    foreach($id in $rsp.data.PartitionKeyRanges.Id) {
+        Invoke-CosmosQuery -Query 'select * from c' -collection veryLargeCollection -PartitionKeyRangeId $id -AutoContinue
+    }
 
     Description
     -----------
-    This command retrieves partition key ranges for collection 'docs'
+    This command demonstrates how to use partition key ranges to query very large collection that would otherwise return error 'This cross-partition query cannot be served by gateway...'
 #>
     param
     (
