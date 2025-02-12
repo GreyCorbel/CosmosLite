@@ -24,7 +24,7 @@ function New-CosmosUpdateOperation
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
-        [ValidateSet('Add','Set','Replace','Remove','Increment')]
+        [ValidateSet('Add','Set','Replace','Remove','Increment','Move')]
         [string]
             #Type of update operation to perform
         $Operation,
@@ -35,9 +35,13 @@ function New-CosmosUpdateOperation
             # /path/path/fieldName format
         $TargetPath,
 
-        [Parameter()]
+        [Parameter(ParameterSetName = 'NonMove')]
             #value to be used by operation
-        $Value
+        $Value,
+        
+        [Parameter(Mandatory, ParameterSetName = 'Move')]
+            #source path for move operation
+        [string]$From
     )
     begin
     {
@@ -47,15 +51,44 @@ function New-CosmosUpdateOperation
             Remove = 'remove'
             Replace = 'replace'
             Increment = 'incr'
+            Move = 'move'
         }
     }
     process
     {
-        [PSCustomObject]@{
-            PSTypeName = 'CosmosLite.UpdateOperation'
-            op = $ops[$Operation]
-            path = $TargetPath
-            value = $Value
+        switch($PSCmdlet.ParameterSetName)
+        {
+            'Move' {
+                [PSCustomObject]@{
+                    PSTypeName = 'CosmosLite.UpdateOperation'
+                    op = $ops[$Operation]
+                    path = $TargetPath
+                    from = $From
+                }
+                break;
+            }
+            default {
+                switch($Operation)
+                {
+                    'Remove' {
+                        [PSCustomObject]@{
+                            PSTypeName = 'CosmosLite.UpdateOperation'
+                            op = $ops[$Operation]
+                            path = $TargetPath
+                        }
+                        break;
+                    }
+                    default {
+                        [PSCustomObject]@{
+                            PSTypeName = 'CosmosLite.UpdateOperation'
+                            op = $ops[$Operation]
+                            path = $TargetPath
+                            value = $Value
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 }
