@@ -268,8 +268,31 @@ do
     throw $rslt.data
   }
 }while($null -ne $rslt.Continuation)
-
 ```
+
+Some large collections are distributed acrosss multiple physical partitions, and you may receive error similar to this when executing cross-partitio query: `The provided cross partition query can not be directly served by the gateway. This is a first chance (internal) exception that all newer clients will know how to handle gracefully.`  
+To ovecome this, you can get IDs of all partition key ranges and then execute query for each partition range separately. This is done by `Get-CosmosCollectionPartitionKeyRanges` command that returns list of partition key ranges for collection, and then you can use `Invoke-CosmosQuery` command with `-PartitionKeyRangeId` parameter to specify partition range ID to query.
+
+```powershell
+$rangeIdsResponse = Get-CosmosCollectionPartitionKeyRanges -Collection myCollection
+$partitionRanges = $rangeIdsResponse.data.PartitionKeyRanges
+$query = "select * from c"
+foreach($range in $partitionRanges)
+{
+    #invoke Cosmos query for each partition range
+    $rsp = Invoke-CosmosQuery -Query $query -Collection myCollection -PartitionKeyRangeId $range.id
+    if($rsp.IsSuccess)
+    {
+      #process the results
+    }
+    else
+    {
+      #contains error returned by server
+      throw $rsp.data
+    }
+}
+```
+ 
 ### Stored procedures
 Invoke Cosmos stored procedure:
 ```powershell
