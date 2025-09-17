@@ -115,46 +115,64 @@ function Invoke-CosmosQuery
             $Type = [QueryResponse]
         }
         else {$Type=$null}
-
-        do
+        if($AutoContinue -and $null -eq $PartitionKeyRangeId)
         {
-            $rq = Get-CosmosRequest `
-                -PartitionKey $partitionKey `
-                -PartitionKeyRangeId $PartitionKeyRangeId `
-                -Type Query `
-                -MaxItems $MaxItems `
-                -Continuation $ContinuationToken `
-                -PopulateMetrics:$PopulateMetrics `
-                -Context $Context `
-                -Collection $Collection `
-                -TargetType $Type
-
-            $QueryDefinition = @{
-                query = $Query
-            }
-            if($null -ne $QueryParameters)
+            Write-Verbose "AutoContinue specified but PartitionKeyRangeId not specified. Retrieving all partition key ranges for collection $Collection"
+            #get all partition key ranges for the collection
+            $rsp = Get-CosmosCollectionPartitionKeyRanges -Collection $Collection -Context $Context
+            if(-not $rsp.IsSuccess)
             {
-                $QueryDefinition['parameters']=@()
-                foreach($key in $QueryParameters.Keys)
+                Write-Warning "Failed to retrieve partition key ranges for collection $Collection. Error: $($rsp.Data)"
+                return
+            }
+            $partitionKeyRangeIds = $rsp.data.PartitionKeyRanges.Id
+        }
+        else {
+            $partitionKeyRangeIds = @($PartitionKeyRangeId)
+        }
+        foreach($id in $partitionKeyRangeIds)
+        {
+            if($null -ne $id) { Write-Verbose "Querying PartitionKeyRangeId $id" }
+            do
+            {
+                $rq = Get-CosmosRequest `
+                    -PartitionKey $partitionKey `
+                    -PartitionKeyRangeId $id `
+                    -Type Query `
+                    -MaxItems $MaxItems `
+                    -Continuation $ContinuationToken `
+                    -PopulateMetrics:$PopulateMetrics `
+                    -Context $Context `
+                    -Collection $Collection `
+                    -TargetType $Type
+
+                $QueryDefinition = @{
+                    query = $Query
+                }
+                if($null -ne $QueryParameters)
                 {
-                    $QueryDefinition['parameters']+=@{
-                        name=$key
-                        value=$QueryParameters[$key]
+                    $QueryDefinition['parameters']=@()
+                    foreach($key in $QueryParameters.Keys)
+                    {
+                        $QueryDefinition['parameters']+=@{
+                            name=$key
+                            value=$QueryParameters[$key]
+                        }
                     }
                 }
-            }
-            $rq.Method = [System.Net.Http.HttpMethod]::Post
-            $uri = "$url"
-            $rq.Uri = New-Object System.Uri($uri)
-            $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
-            $rq.ContentType = 'application/query+json'
+                $rq.Method = [System.Net.Http.HttpMethod]::Post
+                $uri = "$url"
+                $rq.Uri = New-Object System.Uri($uri)
+                $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
+                $rq.ContentType = 'application/query+json'
 
-            $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
-            $response
-            #auto-continue if requested
-            if(-not $AutoContinue) {break;}
-            if([string]::IsNullOrEmpty($response.Continuation)) {break;}
-            $ContinuationToken = $response.Continuation
-        }while($true)
+                $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+                $response
+                #auto-continue if requested
+                if(-not $AutoContinue) {break;}
+                if([string]::IsNullOrEmpty($response.Continuation)) {break;}
+                $ContinuationToken = $response.Continuation
+            }while($true)
+        }
     }
 }
