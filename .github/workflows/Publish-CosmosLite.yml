@@ -71,7 +71,7 @@ jobs:
       if: ${{ (github.event_name != 'workflow_dispatch') || github.event.inputs.publish }}
       shell: pwsh
       env:
-        SECRET: ${{ secrets.PSGallery_APIKey }}
+        SECRET: ${{ secrets.GC_PSGALLERY_APIKEY }}
       run: |
         # see https://github.com/PowerShell/PSResourceGet/issues/1806
         Get-PSResourceRepository | out-null
