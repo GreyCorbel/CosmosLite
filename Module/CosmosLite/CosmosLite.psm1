@@ -564,6 +564,24 @@ function Invoke-CosmosQuery
     Description
     -----------
     This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+
+.EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity -CollectResponseHeaders
+    $query = "select * from c where c.itemType = @itemType"
+    $queryParams = @{
+        '@itemType' = 'person'
+    }
+    $rsp = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' -MaxItems 10 -AutoContinue -PopulateMetrics
+    if($rsp.IsSuccess)
+    {
+        $rsp.data.Documents
+        "Total RU consumption: $($rsp | Measure-Object -Property Charge -Sum | select -ExpandProperty Sum)"
+    }
+
+    Description
+    -----------
+    This command performs cross partition parametrized query, potentially iterating over all partition key ranges, and fetches all matching documents, automatically paginating over all pages.  
+    Command also measures total RU consumption and populates 'x-ms-documentdb-query-metrics' header in the response across all subqueries
 #>
 
     [CmdletBinding()]
@@ -617,8 +635,9 @@ function Invoke-CosmosQuery
         $PopulateMetrics,
 
         [switch]
-            #when response contains continuation token, returns the reesponse and automatically sends new request with continuation token
-            #this simnlifies getting all data from query for large datasets
+            #when response contains continuation token, returns the response and automatically sends new request with continuation token
+            #on large collection with multiple partitions, it also iterates over all partition key ranges and queries them one by one
+            #this simplifies getting all data from query for large datasets
         $AutoContinue,
 
         [Parameter()]

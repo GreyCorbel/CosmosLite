@@ -34,6 +34,7 @@ function Invoke-CosmosQuery
     This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
 
 .EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity -CollectResponseHeaders
     $query = "select * from c where c.itemType = @itemType"
     $queryParams = @{
         '@itemType' = 'person'
@@ -43,13 +44,12 @@ function Invoke-CosmosQuery
     {
         $rsp.data.Documents
         "Total RU consumption: $($rsp | Measure-Object -Property Charge -Sum | select -ExpandProperty Sum)"
-        "Total query time: $($rsp | select-object -expandProperty QueryMetrics | Measure-Object -Property TotalTime -Sum | select -ExpandProperty Sum)"
     }
 
     Description
     -----------
     This command performs cross partition parametrized query, potentially iterating over all partition key ranges, and fetches all matching documents, automatically paginating over all pages.  
-    Command also measures total RU consumption and populates query metrics in the response and measures total query time across all subqueries
+    Command also measures total RU consumption and populates 'x-ms-documentdb-query-metrics' header in the response across all subqueries
 #>
 
     [CmdletBinding()]
