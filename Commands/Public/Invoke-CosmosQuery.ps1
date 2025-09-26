@@ -189,8 +189,9 @@ function Invoke-CosmosQuery
                 $response
                 #auto-continue if requested
                 if(-not $AutoContinue) {break;}
-                if([string]::IsNullOrEmpty($response.Continuation)) {break;}
                 $ContinuationToken = $response.Continuation
+                if([string]::IsNullOrEmpty($ContinuationToken)) {break;}
+                Write-Verbose "Continuing query with continuation token: $ContinuationToken"
             }while($true)
         }
     }
