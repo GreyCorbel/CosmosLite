@@ -86,6 +86,12 @@ function Connect-Cosmos
             #Default: default MSAL redirect Uri
         $RedirectUri,
 
+        [Parameter()]
+        [string]
+            #Custom scope to request token for instead of default one constructed from AccountName
+            #Typical generic scope: https://cosmos.azure.com/.default
+        $Scope,
+
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [string]
             #Client secret for ClientID
@@ -130,6 +136,7 @@ function Connect-Cosmos
         [Switch]
             #Whether to collect all response headers
         $CollectResponseHeaders,
+
         [switch]
             #Whether to use preview API version
         $Preview,
@@ -175,35 +182,39 @@ function Connect-Cosmos
         }
 
         try {
-                switch($PSCmdlet.ParameterSetName)
-                {
-                    'ExistingFactory' {
-                        #nothing specific here
-                        break;
-                    }
-                    'PublicClient' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
-                        break;
-                    }
-                    'ConfidentialClientWithSecret' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
-                        break;
-                    }
-                    'ConfidentialClientWithCertificate' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
-                        break;
-                    }
-                    'MSI' {
-                        $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
-                        break;
-                    }
-                    'ResourceOwnerPasssword' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
-                        break;
-                    }
+            if(-not [string]::IsNullOrEmpty($Scope))
+            {
+                $script:Configuration.RequiredScopes = @($Scope)
+            }
+            switch($PSCmdlet.ParameterSetName)
+            {
+                'ExistingFactory' {
+                    #nothing specific here
+                    break;
                 }
-                $script:Configuration.AuthFactory = $Factory
-                $script:Configuration
+                'PublicClient' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
+                    break;
+                }
+                'ConfidentialClientWithSecret' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
+                    break;
+                }
+                'ConfidentialClientWithCertificate' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
+                    break;
+                }
+                'MSI' {
+                    $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
+                    break;
+                }
+                'ResourceOwnerPasssword' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
+                    break;
+                }
+            }
+            $script:Configuration.AuthFactory = $Factory
+            $script:Configuration
         }
         catch {
             throw
