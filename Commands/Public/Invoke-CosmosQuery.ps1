@@ -118,6 +118,22 @@ function Invoke-CosmosQuery
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
+
+        $QueryDefinition = @{
+            query = $Query
+        }
+        if($null -ne $QueryParameters)
+        {
+            $QueryDefinition['parameters']=@()
+            foreach($key in $QueryParameters.Keys)
+            {
+                $QueryDefinition['parameters']+=@{
+                    name=$key
+                    value=$QueryParameters[$key]
+                }
+            }
+        }
+        $queryRequestPayload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
     }
 
     process
@@ -149,6 +165,7 @@ function Invoke-CosmosQuery
         else {
             $partitionKeyRangeIds = @($PartitionKeyRangeId)
         }
+
         foreach($id in $partitionKeyRangeIds)
         {
             if($null -ne $id) { Write-Verbose "Querying PartitionKeyRangeId $id" }
@@ -165,24 +182,10 @@ function Invoke-CosmosQuery
                     -Collection $Collection `
                     -TargetType $Type
 
-                $QueryDefinition = @{
-                    query = $Query
-                }
-                if($null -ne $QueryParameters)
-                {
-                    $QueryDefinition['parameters']=@()
-                    foreach($key in $QueryParameters.Keys)
-                    {
-                        $QueryDefinition['parameters']+=@{
-                            name=$key
-                            value=$QueryParameters[$key]
-                        }
-                    }
-                }
                 $rq.Method = [System.Net.Http.HttpMethod]::Post
                 $uri = "$url"
                 $rq.Uri = New-Object System.Uri($uri)
-                $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
+                $rq.Payload = $queryRequestPayload
                 $rq.ContentType = 'application/query+json'
 
                 $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context

@@ -10,8 +10,11 @@ function ProcessRequestBatchInternal
 
     begin
     {
-        $outstandingRequests=@()
-        $batch | ForEach-Object{$outstandingRequests+=$_}
+        $outstandingRequests=new-object System.Collections.Generic.List[object]
+        foreach($item in $batch)
+        {
+            [void]$outstandingRequests.Add($item)
+        }
         $maxRetries = $Context.RetryCount
     }
     process
@@ -23,7 +26,7 @@ function ProcessRequestBatchInternal
             
             #process reponses
             #bag for requests to retry
-            $requestsToRetry=@()
+            $requestsToRetry=new-object System.Collections.Generic.List[object]
             #total time to wait in case of throttled
             $waitTime=0
             foreach($request in $outstandingRequests)
@@ -48,7 +51,7 @@ function ProcessRequestBatchInternal
                         if($httpResponse.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) {$wait = [long]$val[0]} else {$wait=1000}
                         #we wait for longest time returned by all 429 responses
                         if($waitTime -lt $wait) {$waitTime = $wait}
-                        $requestsToRetry+=$cosmosRequest
+                        [void]$requestsToRetry.Add($cosmosRequest)
                     }
                     else {
                         #failed or maxRetries exhausted
@@ -62,13 +65,13 @@ function ProcessRequestBatchInternal
             #retry throttled requests
             if($requestsToRetry.Count -gt 0)
             {
-                $outstandingRequests=@()
+                $outstandingRequests=new-object System.Collections.Generic.List[object]
                 $maxRetries--
                 Write-Verbose "Throttled`tRequestsToRetry`t$($requestsToRetry.Count)`tWaitTime`t$waitTime`tRetriesRemaining`t$maxRetries"
                 Start-Sleep -Milliseconds $waitTime
                 foreach($cosmosRequest in $requestsToRetry)
                 {
-                    $outstandingRequests+=SendRequestInternal -rq $cosmosRequest -Context $Context
+                    [void]$outstandingRequests.Add((SendRequestInternal -rq $cosmosRequest -Context $Context))
                 }
             }
             else {
