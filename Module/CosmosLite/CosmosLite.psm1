@@ -339,28 +339,22 @@ function Get-CosmosCollectionPartitionKeyRanges
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/pkranges"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
     {
         $rq = Get-CosmosRequest -Context $Context -Collection $Collection
         $rq.Uri = new-object System.Uri("$url")
-
         $rq.Method = [System.Net.Http.HttpMethod]::Get
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
-        {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
-        }
+        $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -457,7 +451,7 @@ function Get-CosmosDocument
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -468,18 +462,17 @@ function Get-CosmosDocument
         $rq.ETag = $ETag
         $rq.PriorityLevel = $Priority
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+        while ($outstandingRequests.Count -ge $batchSize)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
         }
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -674,7 +667,9 @@ function Invoke-CosmosQuery
                 $rq.Payload = $queryRequestPayload
                 $rq.ContentType = 'application/query+json'
 
-                $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+                $inFlight = [System.Collections.Generic.List[object]]::new()
+                $inFlight.Add((SendRequestInternal -rq $rq -Context $Context))
+                $response = ProcessRequestBatchInternal -InFlight $inFlight -Context $Context
                 $response
                 #auto-continue if requested
                 if(-not $AutoContinue) {break;}
@@ -748,7 +743,7 @@ function Invoke-CosmosStoredProcedure
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/sprocs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -765,18 +760,17 @@ function Invoke-CosmosStoredProcedure
         $rq.Payload = $Parameters
         $rq.ContentType = 'application/json'
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+        while ($outstandingRequests.Count -ge $batchSize)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
         }
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -870,7 +864,7 @@ function New-CosmosDocument
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -908,19 +902,18 @@ function New-CosmosDocument
             $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
             $rq.ContentType = 'application/json'
 
-            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-            if($outstandingRequests.Count -ge $batchSize)
+            $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+            while ($outstandingRequests.Count -ge $batchSize)
             {
-                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-                $outstandingRequests=@()
+                ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
             }
         }
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -1170,7 +1163,7 @@ function Remove-CosmosDocument
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -1190,11 +1183,10 @@ function Remove-CosmosDocument
             $rq.Method = [System.Net.Http.HttpMethod]::Delete
             $rq.Uri = new-object System.Uri("$url/$id")
 
-            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-            if($outstandingRequests.Count -ge $batchSize)
+            $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+            while ($outstandingRequests.Count -ge $batchSize)
             {
-                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-                $outstandingRequests=@()
+                ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
             }
         }
         else
@@ -1204,9 +1196,9 @@ function Remove-CosmosDocument
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -1294,7 +1286,7 @@ function Set-CosmosDocument
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -1321,18 +1313,17 @@ function Set-CosmosDocument
         $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
         $rq.ContentType = 'application/json'
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+        while ($outstandingRequests.Count -ge $batchSize)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
         }
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -1432,7 +1423,7 @@ function Update-CosmosDocument
     begin
     {
         $url = "$($Context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -1454,20 +1445,18 @@ function Update-CosmosDocument
             $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
             $rq.ContentType = 'application/json_patch+json'
 
-            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-
-            if($outstandingRequests.Count -ge $batchSize)
+            $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+            while ($outstandingRequests.Count -ge $batchSize)
             {
-                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-                $outstandingRequests=@()
+                ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
             }
         }
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
@@ -1791,82 +1780,59 @@ function ProcessRequestBatchInternal
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
-        [PSCustomObject[]]$Batch,
+        [System.Collections.Generic.List[object]]
+            #Mutable list of in-flight request contexts. Completed entries are removed in-place;
+            #retried entries are re-added. The caller sees the updated list after each call.
+        $InFlight,
         [Parameter(Mandatory)]
-        [PSTypeName('CosmosLite.Connection')]$Context
+        [PSTypeName('CosmosLite.Connection')]$Context,
+        [switch]
+            #When set, wait for exactly ONE request to complete and return.
+            #Intended for use in process blocks to maintain a sliding concurrency window.
+            #When not set (default), drain all remaining requests (for end blocks).
+        $DrainOne
     )
 
-    begin
-    {
-        $outstandingRequests=new-object System.Collections.Generic.List[object]
-        foreach($item in $batch)
-        {
-            [void]$outstandingRequests.Add($item)
-        }
-        $maxRetries = $Context.RetryCount
-    }
     process
     {
+        if ($InFlight.Count -eq 0) { return }
+
         do
         {
-            #we have enough HttpRequests sent - wait for completion
-            [System.Threading.Tasks.Task]::WaitAll($outstandingRequests.HttpTask)
-            
-            #process reponses
-            #bag for requests to retry
-            $requestsToRetry=new-object System.Collections.Generic.List[object]
-            #total time to wait in case of throttled
-            $waitTime=0
-            foreach($request in $outstandingRequests)
-            {
-                #dispose related httpRequestMessage
-                $request.HttpRequest.Dispose()
+            # Build Task[] from current in-flight list and wait for the first to complete.
+            # Task.WaitAny returns the index of the completed task in the supplied array,
+            # which corresponds directly to the same index in $InFlight.
+            $tasks = [System.Threading.Tasks.Task[]]($InFlight | ForEach-Object { $_.HttpTask })
+            $idx   = [System.Threading.Tasks.Task]::WaitAny($tasks)
 
-                #get httpResponseMessage
-                $httpResponse = $request.HttpTask.Result
-                #and associated CosmosLiteRequest
-                $cosmosRequest = $request.CosmosLiteRequest
-                if($httpResponse.IsSuccessStatusCode) {
-                    #successful - process response
-                    ProcessCosmosResponseInternal -ResponseContext $request -Context $Context
-                }
-                else
-                {
-                    if($httpResponse.StatusCode -eq 429 -and $maxRetries -gt 0)
-                    {
-                        #get waitTime
-                        $val = $null
-                        if($httpResponse.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) {$wait = [long]$val[0]} else {$wait=1000}
-                        #we wait for longest time returned by all 429 responses
-                        if($waitTime -lt $wait) {$waitTime = $wait}
-                        [void]$requestsToRetry.Add($cosmosRequest)
-                    }
-                    else {
-                        #failed or maxRetries exhausted
-                        ProcessCosmosResponseInternal -ResponseContext $request -Context $Context
-                    }
-                }
-                #dispose httpResponseMessage
+            $completed = $InFlight[$idx]
+            [void]$InFlight.RemoveAt($idx)
+
+            $completed.HttpRequest.Dispose()
+            $httpResponse = $completed.HttpTask.Result
+
+            if ($httpResponse.IsSuccessStatusCode)
+            {
+                ProcessCosmosResponseInternal -ResponseContext $completed -Context $Context
                 $httpResponse.Dispose()
             }
-
-            #retry throttled requests
-            if($requestsToRetry.Count -gt 0)
+            elseif ($httpResponse.StatusCode -eq 429 -and $completed.RetriesRemaining -gt 0)
             {
-                $outstandingRequests=new-object System.Collections.Generic.List[object]
-                $maxRetries--
-                Write-Verbose "Throttled`tRequestsToRetry`t$($requestsToRetry.Count)`tWaitTime`t$waitTime`tRetriesRemaining`t$maxRetries"
-                Start-Sleep -Milliseconds $waitTime
-                foreach($cosmosRequest in $requestsToRetry)
-                {
-                    [void]$outstandingRequests.Add((SendRequestInternal -rq $cosmosRequest -Context $Context))
-                }
+                $val = $null
+                if ($httpResponse.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) { $wait = [long]$val[0] } else { $wait = 1000 }
+                $httpResponse.Dispose()
+                $remaining = $completed.RetriesRemaining - 1
+                Write-Verbose "Throttled`tWaitTime`t$wait`tRetriesRemaining`t$remaining"
+                Start-Sleep -Milliseconds $wait
+                [void]$InFlight.Add((SendRequestInternal -rq $completed.CosmosLiteRequest -Context $Context -RetriesRemaining $remaining))
             }
-            else {
-                #no requests to retry
-                break
+            else
+            {
+                # Failed response or retries exhausted — surface as error via ProcessCosmosResponseInternal
+                ProcessCosmosResponseInternal -ResponseContext $completed -Context $Context
+                $httpResponse.Dispose()
             }
-        }while($true)
+        } while (-not $DrainOne -and $InFlight.Count -gt 0)
     }
 }
 function SendRequestInternal
@@ -1876,17 +1842,21 @@ function SendRequestInternal
         [Parameter(Mandatory)]
         [PSCustomObject]$rq,
         [Parameter(Mandatory)]
-        [PSTypeName('CosmosLite.Connection')]$Context
+        [PSTypeName('CosmosLite.Connection')]$Context,
+        [Parameter()]
+        [int]
+            #Remaining retry attempts for this request. Defaults to Context.RetryCount on first send.
+        $RetriesRemaining = -1
     )
 
     process
     {
         $httpRequest = GetCosmosRequestInternal -rq $rq
-        #pair our request to task for possible retry and batch executing tasks
         [PSCustomObject]@{
-            CosmosLiteRequest = $rq
-            HttpRequest = $httpRequest
-            HttpTask = $Context.HttpClient.SendAsync($httpRequest)
+            CosmosLiteRequest  = $rq
+            HttpRequest        = $httpRequest
+            HttpTask           = $Context.HttpClient.SendAsync($httpRequest)
+            RetriesRemaining   = if ($RetriesRemaining -lt 0) { $Context.RetryCount } else { $RetriesRemaining }
         }
     }
 }
