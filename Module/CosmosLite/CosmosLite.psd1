@@ -12,7 +12,7 @@
 RootModule = '.\CosmosLite.psm1'
 
 # Version number of this module.
-ModuleVersion = '3.1.2'
+ModuleVersion = '3.2.0'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core', 'Desktop')
@@ -51,7 +51,7 @@ CLRVersion = ''
 ProcessorArchitecture = ''
 
 # Modules that must be imported into the global environment prior to importing this module
-RequiredModules = @(@{ModuleName="AadAuthenticationFactory"; ModuleVersion="3.0.2"; GUID='9d860f96-4bde-41d3-890b-1a3f51c34d68'})
+RequiredModules = @(@{ModuleName="AadAuthenticationFactory"; ModuleVersion="3.1.2"; GUID='9d860f96-4bde-41d3-890b-1a3f51c34d68'})
 
 # Assemblies that must be loaded prior to importing this module
 RequiredAssemblies = @()
@@ -103,7 +103,7 @@ PrivateData = @{
         ProjectUri = 'https://github.com/greycorbel/CosmosLite'
 
         # Prerelease string of this module
-        #Prerelease = 'beta2'
+        Prerelease = 'beta1'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         RequireLicenseAcceptance = $false
