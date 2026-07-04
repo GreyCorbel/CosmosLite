@@ -2,14 +2,14 @@ function Get-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Retrieves document from the collection
+    Retrieves a document by id and partition key.
 
 .DESCRIPTION
-    Retrieves document from the collection by id and partition key
-    Command supports parallel processing.
+    Reads one or more documents from the specified collection.
+    Supports pipeline input and batched parallel request processing via -BatchSize.
 
 .OUTPUTS
-    Response containing retrieved document parsed from JSON format.
+    CosmosLite response object containing the requested document.
 
 .EXAMPLE
     $rsp = Get-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
@@ -17,7 +17,7 @@ function Get-CosmosDocument
 
     Description
     -----------
-    This command retrieves document with id = '123' and partition key 'test-docs' from collection 'docs'
+    Retrieves document 123 from collection docs in partition test-docs.
 #>
     param
     (

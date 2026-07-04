@@ -2,24 +2,24 @@ function Get-CosmosCollectionPartitionKeyRanges
 {
 <#
 .SYNOPSIS
-    Retrieves partition key ranges for the collection
+    Returns partition key ranges for a collection.
 
 .DESCRIPTION
-    Retrieves partition key ranges for the collection  
-    This helps with execution of cross partition queries
+    Retrieves partition key range metadata for the specified collection.
+    This is useful for advanced query scenarios, such as manual fan-out across ranges.
 
 .OUTPUTS
-    Response containing partition key ranges for collection.
+    CosmosLite response object containing partition key range metadata.
 
 .EXAMPLE
-    $rsp = Get-CosmosCollectioPartitionKeyRanges -Collection veryLargeCollection
+    $rsp = Get-CosmosCollectionPartitionKeyRanges -Collection veryLargeCollection
     foreach($id in $rsp.data.PartitionKeyRanges.Id) {
         Invoke-CosmosQuery -Query 'select * from c' -collection veryLargeCollection -PartitionKeyRangeId $id -AutoContinue
     }
 
     Description
     -----------
-    This command demonstrates how to use partition key ranges to query very large collection that would otherwise return error 'This cross-partition query cannot be served by gateway...'
+    Demonstrates using explicit partition key ranges for large cross-partition query workloads.
 #>
     param
     (

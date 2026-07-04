@@ -2,14 +2,15 @@ function Get-CosmosAccessToken
 {
     <#
 .SYNOPSIS
-    Retrieves AAD token for authentication with selected CosmosDB
+    Retrieves an access token for the current CosmosLite connection.
 
 .DESCRIPTION
-    Retrieves AAD token for authentication with selected CosmosDB.
-    Can be used for debug purposes; module itself gets token as needed, including refreshing the tokens when they expire
+    Acquires a Microsoft Entra ID token for the configured Cosmos DB account.
+    This command is primarily useful for troubleshooting or diagnostics.
+    Most commands acquire and refresh tokens automatically when needed.
 
 .OUTPUTS
-    AuthenticationResult returned by AAD that contains access token and other information about logged-in identity.
+    Microsoft.Identity.Client.AuthenticationResult.
 
 .NOTES
     See https://learn.microsoft.com/en-us/dotnet/api/microsoft.identity.client.authenticationresult
@@ -19,7 +20,7 @@ function Get-CosmosAccessToken
 
     Description
     -----------
-    This command retrieves configuration for specified CosmosDB account and database, and retrieves access token for it using well-known clientId of Azure PowerShell
+    Creates a connection and returns the access token for that context.
 #>
 
     param

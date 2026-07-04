@@ -2,13 +2,14 @@ function New-CosmosUpdateOperation
 {
 <#
 .SYNOPSIS
-    Constructs document update description
+    Creates a single partial update operation.
 
 .DESCRIPTION
-    Constructs document update description. Used together with Update-CosmosDocument command.
+    Builds one CosmosLite.UpdateOperation entry for use in a CosmosLite.Update object.
+    Use this command with New-CosmosDocumentUpdate and Update-CosmosDocument.
     
 .OUTPUTS
-    Document update descriptor
+    CosmosLite.UpdateOperation object.
 
 .EXAMPLE
     $Updates = @()
@@ -18,7 +19,7 @@ function New-CosmosUpdateOperation
 
     Description
     -----------
-    This command replaces field 'content' and adds value to array field 'arrData' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs'
+    Creates multiple patch operations and applies them to a document.
 #>
 
     [CmdletBinding()]

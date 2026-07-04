@@ -2,14 +2,14 @@ function Get-CosmosConnection
 {
 <#
 .SYNOPSIS
-    Returns most recently created Cosmos connection object
+    Returns the currently cached CosmosLite connection.
 
 .DESCRIPTION
-    Returns most recently created cosmos connection object that is cached inside the module.
-    Useful when you do not want to keep connection object in variable and reach for it only when needed
+    Returns the most recently created CosmosLite connection object stored in module scope.
+    Use this when you want to inspect or reuse the active context without storing it in a separate variable.
 
 .OUTPUTS
-    Connection configuration object.
+    CosmosLite.Connection object.
 
 #>
     param ()

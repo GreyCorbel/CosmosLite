@@ -2,14 +2,15 @@ function Invoke-CosmosQuery
 {
 <#
 .SYNOPSIS
-    Queries collection for documents
+    Executes a SQL query against a Cosmos DB collection.
 
 .DESCRIPTION
-    Queries the collection and returns documents that fulfill query conditions.
-    Data returned may not be complete; in such case, returned object contains continuation token in 'Continuation' property. To receive more data, execute command again with parameter ContinuationToken set to value returned in Continuation field by previous command call.
+    Executes a query and returns matching documents.
+    Results can be paged. When more data is available, the response contains a continuation token.
+    Use -ContinuationToken to request the next page, or use -AutoContinue to iterate automatically.
     
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object for each query page.
 
 .EXAMPLE
     $query = "select * from c where c.itemType = @itemType"
@@ -31,7 +32,7 @@ function Invoke-CosmosQuery
 
     Description
     -----------
-    This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+    Performs a parameterized cross-partition query and manually follows continuation tokens.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity -CollectResponseHeaders
@@ -48,8 +49,7 @@ function Invoke-CosmosQuery
 
     Description
     -----------
-    This command performs cross partition parametrized query, potentially iterating over all partition key ranges, and fetches all matching documents, automatically paginating over all pages.  
-    Command also measures total RU consumption and populates 'x-ms-documentdb-query-metrics' header in the response across all subqueries
+    Performs a parameterized query and automatically iterates pages and partition ranges with -AutoContinue.
 #>
 
     [CmdletBinding()]
@@ -60,6 +60,7 @@ function Invoke-CosmosQuery
         $Query,
 
         [Parameter()]
+        [Alias('Parameters')]
         [System.Collections.Hashtable]
             #Query parameters if the query string contains parameter placeholders
             #Parameter names must start with '@' char

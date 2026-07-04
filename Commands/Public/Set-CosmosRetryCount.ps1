@@ -2,21 +2,21 @@ function Set-CosmosRetryCount
 {
 <#
 .SYNOPSIS
-    Sets up maximum number of retries when requests are throttled
+    Sets the retry count for throttled requests.
 
 .DESCRIPTION
-    When requests are throttled (server return http 429 code), ruuntime retries the operation for # of times specified here. Default number of retries is 10.
-    Waiting time between operations is specified by server together with http 429 response
+    Updates the maximum retry attempts used when Cosmos DB responds with HTTP 429 (Too Many Requests).
+    Retry delay is taken from server-provided headers.
     
 .OUTPUTS
-    No output
+    None.
 
 .EXAMPLE
     Set-CosmosRetryCount -RetryCount 20
 
     Description
     -----------
-    This command sets maximus retries for throttled requests to 20
+    Sets the throttling retry limit to 20 for the active context.
 #>
 
     [CmdletBinding()]

@@ -2,14 +2,15 @@ function New-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Inserts new document into collection
+    Creates a new document in a collection.
 
 .DESCRIPTION
-    Inserts new document into collection, or replaces existing when asked to perform upsert.
-    Command supports parallel processing.
+    Inserts a document into the target collection.
+    When -IsUpsert is specified, an existing document with the same id and partition key is replaced.
+    Supports pipeline input and batched parallel request processing.
 
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     $doc = [Ordered]@{
@@ -21,10 +22,10 @@ function New-CosmosDocument
 
     Description
     -----------
-    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Upserts a document with id 123 in collection docs and partition test-docs.
 #>
 
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
         [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'RawPayload')]
         [string]
@@ -92,9 +93,11 @@ function New-CosmosDocument
 
     process
     {
+        $documentId = $null
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
+            $documentId = $DocumentObject.id
             #when in pipeline in PS5.1, parameter retains value across invocations
             $PartitionKey = @()
             foreach($attribute in $PartitionKeyAttribute)
@@ -103,26 +106,32 @@ function New-CosmosDocument
             }
         }
 
-        $rq = Get-CosmosRequest `
-            -PartitionKey $partitionKey `
-            -Type Document `
-            -Context $Context `
-            -Collection $Collection `
-            -Upsert:$IsUpsert
-        
-        $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $rq.Uri = new-object System.Uri($url)
-        $rq.Payload = $Document
-        $rq.ETag = $ETag
-        $rq.PriorityLevel = $Priority
-        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
-        $rq.ContentType = 'application/json'
+        $target = if([string]::IsNullOrEmpty($documentId)) { "$Collection/<unknown-id>" } else { "$Collection/$documentId" }
+        $operation = if($IsUpsert.IsPresent) { 'Upsert Cosmos document' } else { 'Create Cosmos document' }
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        if($PSCmdlet.ShouldProcess($target, $operation))
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            $rq = Get-CosmosRequest `
+                -PartitionKey $partitionKey `
+                -Type Document `
+                -Context $Context `
+                -Collection $Collection `
+                -Upsert:$IsUpsert
+
+            $rq.Method = [System.Net.Http.HttpMethod]::Post
+            $rq.Uri = new-object System.Uri($url)
+            $rq.Payload = $Document
+            $rq.ETag = $ETag
+            $rq.PriorityLevel = $Priority
+            $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
+            $rq.ContentType = 'application/json'
+
+            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+            if($outstandingRequests.Count -ge $batchSize)
+            {
+                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+                $outstandingRequests=@()
+            }
         }
     }
     end

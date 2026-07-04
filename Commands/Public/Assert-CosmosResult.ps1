@@ -2,24 +2,27 @@ function Assert-CosmosResult
 {
 <#
 .SYNOPSIS
-    This command ensures that CosmosDB operation was successful, and returns result object or throws exception
+    Validates a CosmosLite response and throws on failure.
 
 .DESCRIPTION
-    This command ensures that CosmosDB operation was successful, and returns result object or throws exception of type CosmosLiteException
+    Checks the IsSuccess flag on an input CosmosLite response object.
+    When the operation succeeded, the original response object is passed through.
+    When the operation failed, the command throws a CosmosLiteException built from the response error payload.
 
 .OUTPUTS
-    Response describing result of operation if operation was successful. Otherwise, throws exception of type CosmosLiteException
+    CosmosLite response object when successful.
 
 .NOTES
-    Request field on exception thrown is not set as the command does not have access to request context. To access request context, use -ErrorAction:Stop on command that throws exception with request field set in case of error.
+    The exception thrown by this command does not include request context.
+    To preserve request details, use -ErrorAction Stop on the original command and handle that exception directly.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
-    Get-DosmosDocument -Collection 'myCollection' -Id '1' -PartitionKey 'documents' | Assert-CosmosResult
+    Get-CosmosDocument -Collection 'myCollection' -Id '1' -PartitionKey 'documents' | Assert-CosmosResult
 
     Description
     -----------
-    This command returns document with id = 1 stored in partition 'documents' in collection 'myCollection'. If document is not found, command throws exception of type CosmosLiteException
+    Retrieves a document and throws immediately if the request failed.
 
 #>
 param

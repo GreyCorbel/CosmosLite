@@ -2,15 +2,15 @@ function Update-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Updates content of the document
+    Applies partial updates to a document.
 
 .DESCRIPTION
-    Updates document data according to update operations provided.
-    This command uses Cosmos DB Partial document update API to perform changes on server side without the need to download the document to client, modify it on client side and upload back to server
-    Command supports parallel processing.
+    Applies patch operations to documents by using the Cosmos DB partial document update API.
+    This avoids downloading the full document, editing client-side, and replacing the complete payload.
+    Supports pipeline input, batched parallel processing, and ShouldProcess (-WhatIf and -Confirm).
 
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     $DocUpdate = New-CosmosDocumentUpdate -Id '123' -PartitionKey 'test-docs'
@@ -19,10 +19,10 @@ function Update-CosmosDocument
 
     Description
     -----------
-    This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
+    Applies a single patch operation to update the content property of a document.
 #>
 
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
         [Parameter(Mandatory, ValueFromPipeline)]
         [PSTypeName('CosmosLite.Update')]
@@ -59,27 +59,30 @@ function Update-CosmosDocument
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
-        #PS5.1 does not suppoort Patch method
-        $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
-        $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
-        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
-        $patches = @{
-            operations = $UpdateObject.Updates
-        }
-        if(-not [string]::IsNullOrWhiteSpace($UpdateObject.Condition))
+        if($PSCmdlet.ShouldProcess("$Collection/$($UpdateObject.Id)", 'Update Cosmos document'))
         {
-            $patches['condition'] = $UpdateObject.Condition
-        }
-        $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
-        $rq.ContentType = 'application/json_patch+json'
+            $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
+            #PS5.1 does not suppoort Patch method
+            $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
+            $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
+            $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
+            $patches = @{
+                operations = $UpdateObject.Updates
+            }
+            if(-not [string]::IsNullOrWhiteSpace($UpdateObject.Condition))
+            {
+                $patches['condition'] = $UpdateObject.Condition
+            }
+            $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
+            $rq.ContentType = 'application/json_patch+json'
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
 
-        if($outstandingRequests.Count -ge $batchSize)
-        {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            if($outstandingRequests.Count -ge $batchSize)
+            {
+                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+                $outstandingRequests=@()
+            }
         }
     }
     end

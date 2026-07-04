@@ -2,15 +2,16 @@ function Set-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Replaces document with new document
+    Replaces an existing document.
 
 .DESCRIPTION
-    Replaces document data completely with new data. Document must exist for oepration to succeed.
-    When ETag parameter is specified, document is updated only if etag on server version of document is different.
-    Command supports parallel processing.
+    Replaces document content with the supplied payload.
+    The document must exist.
+    When -Etag is supplied, replacement is conditional on the current server ETag.
+    Supports pipeline input and batched parallel request processing.
     
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     $doc = [Ordered]@{
@@ -22,7 +23,7 @@ function Set-CosmosDocument
 
     Description
     -----------
-    This command replaces entire document with ID '123' and partition key 'test-docs' in collection 'docs' with new content
+    Replaces the full document body for document 123 in collection docs.
 #>
     [CmdletBinding()]
     param (

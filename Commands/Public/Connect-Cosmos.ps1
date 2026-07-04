@@ -2,50 +2,32 @@ function Connect-Cosmos
 {
     <#
 .SYNOPSIS
-    Sets up connection parameters to Cosmos DB.
-    Does not actually perform the connection - connection is established with first request, including authentication
+    Creates a CosmosLite connection context.
 
 .DESCRIPTION
-    Sets up connection parameters to Cosmos DB.
-    Does not actually perform the connection - connection is established with first request, including authentication.
-    Authentication uses by default well-know clientId of Azure Powershell, but can accept clientId of app registered in your own tenant. In this case, application shall have configured API permission to allow delegated access to CosmosDB resource (https://cosmos.azure.com/user_impersonation), or - for Confidential client - RBAC role on CosmosDB account
+    Builds and stores a CosmosLite connection configuration used by all public commands.
+    The command does not send a network request by itself; authentication and connection happen on the first data operation.
+    Supports interactive public client auth, confidential client auth, resource owner password flow, managed identity, or a prebuilt authentication factory.
 
 .OUTPUTS
-    Connection configuration object.
+    CosmosLite.Connection object.
 
 .NOTES
-    Most recently created configuration object is also cached inside the module and is automatically used when not provided to other commands
+    The most recently created connection is cached in module scope and used automatically by other commands when -Context is omitted.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
 
     Description
     -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mydomain.com, with Delegated auth flow
-
-.EXAMPLE
-    $thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
-    $appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
-    $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-    Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
-
-    Description
-    -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mycompany.com, with Application auth flow
+    Creates a connection context using delegated interactive authentication.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity
 
     Description
     -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by System-assigned Managed Identity
-
-.EXAMPLE
-    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
-
-    Description
-    -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by User-assigned Managed Identity
+    Creates a connection context using the local managed identity endpoint.
 #>
 
     param
@@ -155,9 +137,9 @@ function Connect-Cosmos
         [Parameter()]
         [int]
             #Maximum continuation token size in KB
-            #Default: 6KB
+            #Default: 4KB
             #Decrease when experiencing error 'Request too large'
-        $MaxContinuationTokenSizeInKb = 6
+        $MaxContinuationTokenSizeInKb = 4
     )
 
     process

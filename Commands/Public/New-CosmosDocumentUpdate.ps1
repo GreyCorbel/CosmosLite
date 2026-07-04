@@ -2,13 +2,14 @@ function New-CosmosDocumentUpdate
 {
 <#
 .SYNOPSIS
-    Constructs document update specification object expected by Update-CosmosDocument command
+    Creates a document update descriptor for partial updates.
 
 .DESCRIPTION
-    Constructs document update description. Used together with Update-CosmosDocument and New-CosmoUpdateOperation commands.
+    Builds a CosmosLite.Update object used by Update-CosmosDocument.
+    Combine it with one or more operations created by New-CosmosUpdateOperation.
 
 .OUTPUTS
-    Document update specification
+    CosmosLite.Update object.
 
 .EXAMPLE
     $query = 'select c.id,c.pk from c where c.quantity < @threshold'
@@ -32,8 +33,7 @@ function New-CosmosDocumentUpdate
 
     Description
     -----------
-    This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
-    Update is performed in parallel; up to 4 updates are performed at the same time
+    Builds update payloads and increments quantity by 50 for matching documents.
 #>
 
     [CmdletBinding()]

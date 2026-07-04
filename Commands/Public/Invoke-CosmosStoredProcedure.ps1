@@ -2,17 +2,16 @@ function Invoke-CosmosStoredProcedure
 {
 <#
 .SYNOPSIS
-    Call stored procedure
+    Executes a stored procedure.
 
 .DESCRIPTION
-    Calls stored procedure.
-    Command supports parallel processing.
-    Note: Stored procedures that return large dataset also support continuation token, however, continuation token must be passed as parameter, corretly passed to query inside store procedure logivc, and returned as part of stored procedure response.
-      This means that stored procedure logic is fully responsible for handling paging via continuation tokens. 
-      For details, see Cosmos DB server side programming reference
+    Calls a stored procedure in the specified collection and partition.
+    Supports pipeline input and batched parallel request processing.
+    Paging behavior for stored procedures is implemented by the stored procedure itself. If paging is needed,
+    the procedure must accept, propagate, and return continuation state explicitly.
     
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object containing stored procedure output.
 
 .EXAMPLE
     $params = @('123', 'test')
@@ -21,7 +20,7 @@ function Invoke-CosmosStoredProcedure
 
     Description
     -----------
-    This command calls stored procedure and shows result.
+    Executes a stored procedure with two input parameters and returns its response.
 #>
     [CmdletBinding()]
     param (

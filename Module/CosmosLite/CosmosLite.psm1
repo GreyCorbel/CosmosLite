@@ -174,6 +174,12 @@ function Connect-Cosmos
             #Default: default MSAL redirect Uri
         $RedirectUri,
 
+        [Parameter()]
+        [string]
+            #Custom scope to request token for instead of default one constructed from AccountName
+            #Typical generic scope: https://cosmos.azure.com/.default
+        $Scope,
+
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [string]
             #Client secret for ClientID
@@ -218,6 +224,7 @@ function Connect-Cosmos
         [Switch]
             #Whether to collect all response headers
         $CollectResponseHeaders,
+
         [switch]
             #Whether to use preview API version
         $Preview,
@@ -263,35 +270,39 @@ function Connect-Cosmos
         }
 
         try {
-                switch($PSCmdlet.ParameterSetName)
-                {
-                    'ExistingFactory' {
-                        #nothing specific here
-                        break;
-                    }
-                    'PublicClient' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
-                        break;
-                    }
-                    'ConfidentialClientWithSecret' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
-                        break;
-                    }
-                    'ConfidentialClientWithCertificate' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
-                        break;
-                    }
-                    'MSI' {
-                        $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
-                        break;
-                    }
-                    'ResourceOwnerPasssword' {
-                        $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
-                        break;
-                    }
+            if(-not [string]::IsNullOrEmpty($Scope))
+            {
+                $script:Configuration.RequiredScopes = @($Scope)
+            }
+            switch($PSCmdlet.ParameterSetName)
+            {
+                'ExistingFactory' {
+                    #nothing specific here
+                    break;
                 }
-                $script:Configuration.AuthFactory = $Factory
-                $script:Configuration
+                'PublicClient' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -LoginApi $LoginApi -AuthMode $AuthMode -DefaultUsername $UserNameHint -Proxy $proxy
+                    break;
+                }
+                'ConfidentialClientWithSecret' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -RedirectUri $RedirectUri -ClientSecret $clientSecret -LoginApi $LoginApi  -Proxy $proxy
+                    break;
+                }
+                'ConfidentialClientWithCertificate' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -X509Certificate $X509Certificate -LoginApi $LoginApi -Proxy $proxy
+                    break;
+                }
+                'MSI' {
+                    $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
+                    break;
+                }
+                'ResourceOwnerPasssword' {
+                    $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
+                    break;
+                }
+            }
+            $script:Configuration.AuthFactory = $Factory
+            $script:Configuration
         }
         catch {
             throw
@@ -650,6 +661,22 @@ function Invoke-CosmosQuery
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
+
+        $QueryDefinition = @{
+            query = $Query
+        }
+        if($null -ne $QueryParameters)
+        {
+            $QueryDefinition['parameters']=@()
+            foreach($key in $QueryParameters.Keys)
+            {
+                $QueryDefinition['parameters']+=@{
+                    name=$key
+                    value=$QueryParameters[$key]
+                }
+            }
+        }
+        $queryRequestPayload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
     }
 
     process
@@ -681,6 +708,7 @@ function Invoke-CosmosQuery
         else {
             $partitionKeyRangeIds = @($PartitionKeyRangeId)
         }
+
         foreach($id in $partitionKeyRangeIds)
         {
             if($null -ne $id) { Write-Verbose "Querying PartitionKeyRangeId $id" }
@@ -697,24 +725,10 @@ function Invoke-CosmosQuery
                     -Collection $Collection `
                     -TargetType $Type
 
-                $QueryDefinition = @{
-                    query = $Query
-                }
-                if($null -ne $QueryParameters)
-                {
-                    $QueryDefinition['parameters']=@()
-                    foreach($key in $QueryParameters.Keys)
-                    {
-                        $QueryDefinition['parameters']+=@{
-                            name=$key
-                            value=$QueryParameters[$key]
-                        }
-                    }
-                }
                 $rq.Method = [System.Net.Http.HttpMethod]::Post
                 $uri = "$url"
                 $rq.Uri = New-Object System.Uri($uri)
-                $rq.Payload = ($QueryDefinition | ConvertTo-Json -Depth 99 -Compress)
+                $rq.Payload = $queryRequestPayload
                 $rq.ContentType = 'application/query+json'
 
                 $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
@@ -937,7 +951,7 @@ function New-CosmosDocument
     This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
 #>
 
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
         [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'RawPayload')]
         [string]
@@ -1005,9 +1019,11 @@ function New-CosmosDocument
 
     process
     {
+        $documentId = $null
         if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
         {
             $Document = $DocumentObject | ConvertTo-Json -Depth 99 -Compress
+            $documentId = $DocumentObject.id
             #when in pipeline in PS5.1, parameter retains value across invocations
             $PartitionKey = @()
             foreach($attribute in $PartitionKeyAttribute)
@@ -1016,26 +1032,32 @@ function New-CosmosDocument
             }
         }
 
-        $rq = Get-CosmosRequest `
-            -PartitionKey $partitionKey `
-            -Type Document `
-            -Context $Context `
-            -Collection $Collection `
-            -Upsert:$IsUpsert
-        
-        $rq.Method = [System.Net.Http.HttpMethod]::Post
-        $rq.Uri = new-object System.Uri($url)
-        $rq.Payload = $Document
-        $rq.ETag = $ETag
-        $rq.PriorityLevel = $Priority
-        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
-        $rq.ContentType = 'application/json'
+        $target = if([string]::IsNullOrEmpty($documentId)) { "$Collection/<unknown-id>" } else { "$Collection/$documentId" }
+        $operation = if($IsUpsert.IsPresent) { 'Upsert Cosmos document' } else { 'Create Cosmos document' }
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        if($PSCmdlet.ShouldProcess($target, $operation))
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            $rq = Get-CosmosRequest `
+                -PartitionKey $partitionKey `
+                -Type Document `
+                -Context $Context `
+                -Collection $Collection `
+                -Upsert:$IsUpsert
+
+            $rq.Method = [System.Net.Http.HttpMethod]::Post
+            $rq.Uri = new-object System.Uri($url)
+            $rq.Payload = $Document
+            $rq.ETag = $ETag
+            $rq.PriorityLevel = $Priority
+            $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
+            $rq.ContentType = 'application/json'
+
+            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+            if($outstandingRequests.Count -ge $batchSize)
+            {
+                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+                $outstandingRequests=@()
+            }
         }
     }
     end
@@ -1161,7 +1183,7 @@ function Remove-CosmosDocument
     This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
 #>
 
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
     param (
         [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'RawPayload')]
         [string]
@@ -1217,15 +1239,22 @@ function Remove-CosmosDocument
                 $PartitionKey+=$DocumentObject."$attribute"
             }
         }
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
-        $rq.Method = [System.Net.Http.HttpMethod]::Delete
-        $rq.Uri = new-object System.Uri("$url/$id")
-
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        if($PSCmdlet.ShouldProcess("$Collection/$Id", 'Remove Cosmos document'))
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
+            $rq.Method = [System.Net.Http.HttpMethod]::Delete
+            $rq.Uri = new-object System.Uri("$url/$id")
+
+            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+            if($outstandingRequests.Count -ge $batchSize)
+            {
+                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+                $outstandingRequests=@()
+            }
+        }
+        else
+        {
+            Write-Verbose "Skipping document $Collection/$Id"
         }
     }
     end
@@ -1425,7 +1454,7 @@ function Update-CosmosDocument
     This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
 #>
 
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
         [Parameter(Mandatory, ValueFromPipeline)]
         [PSTypeName('CosmosLite.Update')]
@@ -1462,27 +1491,30 @@ function Update-CosmosDocument
 
     process
     {
-        $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
-        #PS5.1 does not suppoort Patch method
-        $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
-        $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
-        $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
-        $patches = @{
-            operations = $UpdateObject.Updates
-        }
-        if(-not [string]::IsNullOrWhiteSpace($UpdateObject.Condition))
+        if($PSCmdlet.ShouldProcess("$Collection/$($UpdateObject.Id)", 'Update Cosmos document'))
         {
-            $patches['condition'] = $UpdateObject.Condition
-        }
-        $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
-        $rq.ContentType = 'application/json_patch+json'
+            $rq = Get-CosmosRequest -PartitionKey $UpdateObject.PartitionKey -Type Document -Context $Context -Collection $Collection
+            #PS5.1 does not suppoort Patch method
+            $rq.Method = [System.Net.Http.HttpMethod]::new('PATCH')
+            $rq.Uri = new-object System.Uri("$url/$($UpdateObject.Id)")
+            $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
+            $patches = @{
+                operations = $UpdateObject.Updates
+            }
+            if(-not [string]::IsNullOrWhiteSpace($UpdateObject.Condition))
+            {
+                $patches['condition'] = $UpdateObject.Condition
+            }
+            $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
+            $rq.ContentType = 'application/json_patch+json'
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
 
-        if($outstandingRequests.Count -ge $batchSize)
-        {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            if($outstandingRequests.Count -ge $batchSize)
+            {
+                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+                $outstandingRequests=@()
+            }
         }
     }
     end
@@ -1804,8 +1836,11 @@ function ProcessRequestBatchInternal
 
     begin
     {
-        $outstandingRequests=@()
-        $batch | ForEach-Object{$outstandingRequests+=$_}
+        $outstandingRequests=new-object System.Collections.Generic.List[object]
+        foreach($item in $batch)
+        {
+            [void]$outstandingRequests.Add($item)
+        }
         $maxRetries = $Context.RetryCount
     }
     process
@@ -1817,7 +1852,7 @@ function ProcessRequestBatchInternal
             
             #process reponses
             #bag for requests to retry
-            $requestsToRetry=@()
+            $requestsToRetry=new-object System.Collections.Generic.List[object]
             #total time to wait in case of throttled
             $waitTime=0
             foreach($request in $outstandingRequests)
@@ -1842,7 +1877,7 @@ function ProcessRequestBatchInternal
                         if($httpResponse.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$val)) {$wait = [long]$val[0]} else {$wait=1000}
                         #we wait for longest time returned by all 429 responses
                         if($waitTime -lt $wait) {$waitTime = $wait}
-                        $requestsToRetry+=$cosmosRequest
+                        [void]$requestsToRetry.Add($cosmosRequest)
                     }
                     else {
                         #failed or maxRetries exhausted
@@ -1856,13 +1891,13 @@ function ProcessRequestBatchInternal
             #retry throttled requests
             if($requestsToRetry.Count -gt 0)
             {
-                $outstandingRequests=@()
+                $outstandingRequests=new-object System.Collections.Generic.List[object]
                 $maxRetries--
                 Write-Verbose "Throttled`tRequestsToRetry`t$($requestsToRetry.Count)`tWaitTime`t$waitTime`tRetriesRemaining`t$maxRetries"
                 Start-Sleep -Milliseconds $waitTime
                 foreach($cosmosRequest in $requestsToRetry)
                 {
-                    $outstandingRequests+=SendRequestInternal -rq $cosmosRequest -Context $Context
+                    [void]$outstandingRequests.Add((SendRequestInternal -rq $cosmosRequest -Context $Context))
                 }
             }
             else {

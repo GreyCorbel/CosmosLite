@@ -2,24 +2,25 @@ function Remove-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Removes document from collection
+    Deletes a document from a collection.
 
 .DESCRIPTION
-    Removes document from collection.
-    Command supports parallel processing.
+    Removes one or more documents identified by id and partition key.
+    Supports pipeline input and batched parallel request processing.
+    Supports ShouldProcess (-WhatIf and -Confirm).
 
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
     Description
     -----------
-    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Deletes document 123 from collection docs in partition test-docs.
 #>
 
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
     param (
         [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'RawPayload')]
         [string]
@@ -75,15 +76,22 @@ function Remove-CosmosDocument
                 $PartitionKey+=$DocumentObject."$attribute"
             }
         }
-        $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
-        $rq.Method = [System.Net.Http.HttpMethod]::Delete
-        $rq.Uri = new-object System.Uri("$url/$id")
-
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
+        if($PSCmdlet.ShouldProcess("$Collection/$Id", 'Remove Cosmos document'))
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
+            $rq = Get-CosmosRequest -PartitionKey $partitionKey -Context $Context -Collection $Collection
+            $rq.Method = [System.Net.Http.HttpMethod]::Delete
+            $rq.Uri = new-object System.Uri("$url/$id")
+
+            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
+            if($outstandingRequests.Count -ge $batchSize)
+            {
+                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+                $outstandingRequests=@()
+            }
+        }
+        else
+        {
+            Write-Verbose "Skipping document $Collection/$Id"
         }
     }
     end
