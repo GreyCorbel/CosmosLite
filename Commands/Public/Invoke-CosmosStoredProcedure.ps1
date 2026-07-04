@@ -78,17 +78,10 @@ function Invoke-CosmosStoredProcedure
         $rq.Payload = $Parameters
         $rq.ContentType = 'application/json'
 
-        $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
-        while ($outstandingRequests.Count -ge $batchSize)
-        {
-            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
-        }
+        SubmitCosmosRequestInternal -rq $rq -InFlight $outstandingRequests -BatchSize $batchSize -Context $Context
     }
     end
     {
-        if ($outstandingRequests.Count -gt 0)
-        {
-            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
-        }
+        DrainCosmosRequestsInternal -InFlight $outstandingRequests -Context $Context
     }
 }

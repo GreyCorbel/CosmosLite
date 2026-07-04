@@ -191,7 +191,7 @@ function Invoke-CosmosQuery
 
                 $inFlight = [System.Collections.Generic.List[object]]::new()
                 $inFlight.Add((SendRequestInternal -rq $rq -Context $Context))
-                $response = ProcessRequestBatchInternal -InFlight $inFlight -Context $Context
+                $response = DrainCosmosRequestsInternal -InFlight $inFlight -Context $Context
                 $response
                 #auto-continue if requested
                 if(-not $AutoContinue) {break;}
