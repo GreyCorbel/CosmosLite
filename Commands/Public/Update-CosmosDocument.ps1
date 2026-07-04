@@ -76,11 +76,11 @@ function Update-CosmosDocument
             $rq.Payload =  $patches | ConvertTo-Json -Depth 99 -Compress
             $rq.ContentType = 'application/json_patch+json'
 
-            SubmitCosmosRequestInternal -rq $rq -InFlight $outstandingRequests -BatchSize $batchSize -Context $Context
+            InvokeCosmosWindowInternal -rq $rq -InFlight $outstandingRequests -BatchSize $batchSize -Context $Context
         }
     }
     end
     {
-        DrainCosmosRequestsInternal -InFlight $outstandingRequests -Context $Context
+        InvokeCosmosWindowInternal -InFlight $outstandingRequests -Context $Context
     }
 }

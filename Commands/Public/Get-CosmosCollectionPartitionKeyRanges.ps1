@@ -51,6 +51,6 @@ function Get-CosmosCollectionPartitionKeyRanges
     }
     end
     {
-        DrainCosmosRequestsInternal -InFlight $outstandingRequests -Context $Context
+        InvokeCosmosWindowInternal -InFlight $outstandingRequests -Context $Context
     }
 }

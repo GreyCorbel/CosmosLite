@@ -118,7 +118,7 @@ function Invoke-CosmosQuery
 
     begin
     {
-        $url = "$($context.Endpoint)/colls/$collection/docs"
+        $uri = new-object System.Uri("$($context.Endpoint)/colls/$collection/docs")
 
         $QueryDefinition = @{
             query = $Query
@@ -184,14 +184,13 @@ function Invoke-CosmosQuery
                     -TargetType $Type
 
                 $rq.Method = [System.Net.Http.HttpMethod]::Post
-                $uri = "$url"
-                $rq.Uri = New-Object System.Uri($uri)
+                $rq.Uri = $uri
                 $rq.Payload = $queryRequestPayload
                 $rq.ContentType = 'application/query+json'
 
                 $inFlight = [System.Collections.Generic.List[object]]::new()
                 $inFlight.Add((SendRequestInternal -rq $rq -Context $Context))
-                $response = DrainCosmosRequestsInternal -InFlight $inFlight -Context $Context
+                $response = InvokeCosmosWindowInternal -InFlight $inFlight -Context $Context
                 $response
                 #auto-continue if requested
                 if(-not $AutoContinue) {break;}

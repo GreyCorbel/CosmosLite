@@ -57,39 +57,31 @@ function New-CosmosUpdateOperation
     }
     process
     {
+        $retVal = @{
+            PSTypeName = 'CosmosLite.UpdateOperation'
+            op = $ops[$Operation]
+            path = $TargetPath
+        }
         switch($PSCmdlet.ParameterSetName)
         {
             'Move' {
-                [PSCustomObject]@{
-                    PSTypeName = 'CosmosLite.UpdateOperation'
-                    op = $ops[$Operation]
-                    path = $TargetPath
-                    from = $From
-                }
+                $retVal.from = $From
                 break;
             }
             default {
                 switch($Operation)
                 {
                     'Remove' {
-                        [PSCustomObject]@{
-                            PSTypeName = 'CosmosLite.UpdateOperation'
-                            op = $ops[$Operation]
-                            path = $TargetPath
-                        }
+                        #nothing more to do for remove operation
                         break;
                     }
                     default {
-                        [PSCustomObject]@{
-                            PSTypeName = 'CosmosLite.UpdateOperation'
-                            op = $ops[$Operation]
-                            path = $TargetPath
-                            value = $Value
-                        }
+                        $retVal.value = $Value
                         break;
                     }
                 }
             }
         }
+        [PSCustomObject]$retVal
     }
 }

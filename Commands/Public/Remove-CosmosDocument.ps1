@@ -82,7 +82,7 @@ function Remove-CosmosDocument
             $rq.Method = [System.Net.Http.HttpMethod]::Delete
             $rq.Uri = new-object System.Uri("$url/$id")
 
-            SubmitCosmosRequestInternal -rq $rq -InFlight $outstandingRequests -BatchSize $batchSize -Context $Context
+            InvokeCosmosWindowInternal -rq $rq -InFlight $outstandingRequests -BatchSize $batchSize -Context $Context
         }
         else
         {
@@ -91,6 +91,6 @@ function Remove-CosmosDocument
     }
     end
     {
-        DrainCosmosRequestsInternal -InFlight $outstandingRequests -Context $Context
+        InvokeCosmosWindowInternal -InFlight $outstandingRequests -Context $Context
     }
 }
