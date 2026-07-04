@@ -1,0 +1,40 @@
+name: Publish-Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'wiki/**'
+  workflow_dispatch:
+
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Publish wiki pages
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git"
+
+          if ! git clone "$WIKI_URL" wiki-repo 2>/dev/null; then
+            echo ""
+            echo "::error::GitHub wiki is not yet initialized."
+            echo "::notice::To initialize: go to https://github.com/${{ github.repository }}/wiki and click 'Create the first page', save any placeholder, then re-run this workflow."
+            exit 1
+          fi
+
+          cp -v wiki/*.md wiki-repo/
+
+          cd wiki-repo
+          git add -A
+          git diff --cached --quiet && echo "No changes to publish." && exit 0
+          git commit -m "Update wiki from main repo [skip ci]"
+          git push
+          echo "Wiki published successfully."
