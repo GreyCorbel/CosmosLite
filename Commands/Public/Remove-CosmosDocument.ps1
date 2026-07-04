@@ -62,7 +62,7 @@ function Remove-CosmosDocument
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -82,11 +82,10 @@ function Remove-CosmosDocument
             $rq.Method = [System.Net.Http.HttpMethod]::Delete
             $rq.Uri = new-object System.Uri("$url/$id")
 
-            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-            if($outstandingRequests.Count -ge $batchSize)
+            $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+            while ($outstandingRequests.Count -ge $batchSize)
             {
-                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-                $outstandingRequests=@()
+                ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
             }
         }
         else
@@ -96,9 +95,9 @@ function Remove-CosmosDocument
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }

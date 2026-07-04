@@ -88,7 +88,7 @@ function New-CosmosDocument
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/docs"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -126,19 +126,18 @@ function New-CosmosDocument
             $rq.NoContentOnResponse = $NoContentOnResponse.IsPresent
             $rq.ContentType = 'application/json'
 
-            $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-            if($outstandingRequests.Count -ge $batchSize)
+            $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
+            while ($outstandingRequests.Count -ge $batchSize)
             {
-                ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-                $outstandingRequests=@()
+                ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context -DrainOne
             }
         }
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
