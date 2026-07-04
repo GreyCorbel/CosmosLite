@@ -189,7 +189,9 @@ function Invoke-CosmosQuery
                 $rq.Payload = $queryRequestPayload
                 $rq.ContentType = 'application/query+json'
 
-                $response = ProcessRequestBatchInternal -Batch (SendRequestInternal -rq $rq -Context $Context) -Context $Context
+                $inFlight = [System.Collections.Generic.List[object]]::new()
+                $inFlight.Add((SendRequestInternal -rq $rq -Context $Context))
+                $response = ProcessRequestBatchInternal -InFlight $inFlight -Context $Context
                 $response
                 #auto-continue if requested
                 if(-not $AutoContinue) {break;}

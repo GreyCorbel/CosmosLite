@@ -38,28 +38,22 @@ function Get-CosmosCollectionPartitionKeyRanges
     begin
     {
         $url = "$($context.Endpoint)/colls/$collection/pkranges"
-        $outstandingRequests=@()
+        $outstandingRequests = [System.Collections.Generic.List[object]]::new()
     }
 
     process
     {
         $rq = Get-CosmosRequest -Context $Context -Collection $Collection
         $rq.Uri = new-object System.Uri("$url")
-
         $rq.Method = [System.Net.Http.HttpMethod]::Get
 
-        $outstandingRequests+=SendRequestInternal -rq $rq -Context $Context
-        if($outstandingRequests.Count -ge $batchSize)
-        {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
-            $outstandingRequests=@()
-        }
+        $outstandingRequests.Add((SendRequestInternal -rq $rq -Context $Context))
     }
     end
     {
-        if($outstandingRequests.Count -gt 0)
+        if ($outstandingRequests.Count -gt 0)
         {
-            ProcessRequestBatchInternal -Batch $outstandingRequests -Context $Context
+            ProcessRequestBatchInternal -InFlight $outstandingRequests -Context $Context
         }
     }
 }
