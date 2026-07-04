@@ -1,70 +1,29 @@
-
-#region Initialization
-if($PSEdition -eq 'Desktop')
-{
-    add-type -AssemblyName System.Collections
-    add-type -AssemblyName system.web
-    add-type -AssemblyName System.Web.Extensions
-    $script:DesktopSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
-    $script:DesktopSerializer.MaxJsonLength = [int]::MaxValue
-    $script:DesktopSerializer.RecursionLimit = 100
-}
-else {
-    add-type -AssemblyName System.Collections
-    add-type -AssemblyName System.Text.Json
-    $Script:JsonSerializerOptions = [System.Text.Json.JsonSerializerOptions]@{
-        PropertyNameCaseInsensitive = $true
-        PropertyNamingPolicy = [System.Text.Json.JsonNamingPolicy]::CamelCase
-        ReadCommentHandling = [System.Text.Json.JsonCommentHandling]::Skip
-        AllowTrailingCommas = $true
-        MaxDepth = 100
-    }
-}
-#endregion Initialization
-
-#region Definitions
-class CosmosLiteException : Exception {
-    [string] $Code
-    [PSCustomObject] $Request
-
-    CosmosLiteException($Code, $Message) : base($Message) {
-        $this.Code = $code
-        $this.Request = $null
-    }
-    CosmosLiteException($Code, $Message, $request) : base($Message) {
-        $this.Code = $code
-        $this.Request = $request
-    }
-
-    [string] ToString() {
-        return "$($this.Code): $($this.Message)"
-     }
-}
-#endregion Definitions
-
-#region Public
+#region Public commands
 function Assert-CosmosResult
 {
 <#
 .SYNOPSIS
-    This command ensures that CosmosDB operation was successful, and returns result object or throws exception
+    Validates a CosmosLite response and throws on failure.
 
 .DESCRIPTION
-    This command ensures that CosmosDB operation was successful, and returns result object or throws exception of type CosmosLiteException
+    Checks the IsSuccess flag on an input CosmosLite response object.
+    When the operation succeeded, the original response object is passed through.
+    When the operation failed, the command throws a CosmosLiteException built from the response error payload.
 
 .OUTPUTS
-    Response describing result of operation if operation was successful. Otherwise, throws exception of type CosmosLiteException
+    CosmosLite response object when successful.
 
 .NOTES
-    Request field on exception thrown is not set as the command does not have access to request context. To access request context, use -ErrorAction:Stop on command that throws exception with request field set in case of error.
+    The exception thrown by this command does not include request context.
+    To preserve request details, use -ErrorAction Stop on the original command and handle that exception directly.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
-    Get-DosmosDocument -Collection 'myCollection' -Id '1' -PartitionKey 'documents' | Assert-CosmosResult
+    Get-CosmosDocument -Collection 'myCollection' -Id '1' -PartitionKey 'documents' | Assert-CosmosResult
 
     Description
     -----------
-    This command returns document with id = 1 stored in partition 'documents' in collection 'myCollection'. If document is not found, command throws exception of type CosmosLiteException
+    Retrieves a document and throws immediately if the request failed.
 
 #>
 param
@@ -90,50 +49,32 @@ function Connect-Cosmos
 {
     <#
 .SYNOPSIS
-    Sets up connection parameters to Cosmos DB.
-    Does not actually perform the connection - connection is established with first request, including authentication
+    Creates a CosmosLite connection context.
 
 .DESCRIPTION
-    Sets up connection parameters to Cosmos DB.
-    Does not actually perform the connection - connection is established with first request, including authentication.
-    Authentication uses by default well-know clientId of Azure Powershell, but can accept clientId of app registered in your own tenant. In this case, application shall have configured API permission to allow delegated access to CosmosDB resource (https://cosmos.azure.com/user_impersonation), or - for Confidential client - RBAC role on CosmosDB account
+    Builds and stores a CosmosLite connection configuration used by all public commands.
+    The command does not send a network request by itself; authentication and connection happen on the first data operation.
+    Supports interactive public client auth, confidential client auth, resource owner password flow, managed identity, or a prebuilt authentication factory.
 
 .OUTPUTS
-    Connection configuration object.
+    CosmosLite.Connection object.
 
 .NOTES
-    Most recently created configuration object is also cached inside the module and is automatically used when not provided to other commands
+    The most recently created connection is cached in module scope and used automatically by other commands when -Context is omitted.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
 
     Description
     -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mydomain.com, with Delegated auth flow
-
-.EXAMPLE
-    $thumbprint = 'e827f78a7acf532eb539479d6afe9c7f703173d5'
-    $appId = '1b69b00f-08fc-4798-9976-af325f7f7526'
-    $cert = dir Cert:\CurrentUser\My\ | where-object{$_.Thumbprint -eq $thumbprint}
-    Connect-Cosmos -AccountName myCosmosDbAccount -Database myDbInCosmosAccount -TenantId mycompany.com -ClientId $appId -X509Certificate $cert
-
-    Description
-    -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb in tenant mycompany.com, with Application auth flow
+    Creates a connection context using delegated interactive authentication.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity
 
     Description
     -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by System-assigned Managed Identity
-
-.EXAMPLE
-    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -ClientId '3a174b1e-7b2a-4f21-a326-90365ff741cf' -UseManagedIdentity
-
-    Description
-    -----------
-    This command returns configuration object for working with CosmosDB account myCosmosDbAccount and database myCosmosDb, with authentication by User-assigned Managed Identity
+    Creates a connection context using the local managed identity endpoint.
 #>
 
     param
@@ -243,9 +184,9 @@ function Connect-Cosmos
         [Parameter()]
         [int]
             #Maximum continuation token size in KB
-            #Default: 6KB
+            #Default: 4KB
             #Decrease when experiencing error 'Request too large'
-        $MaxContinuationTokenSizeInKb = 6
+        $MaxContinuationTokenSizeInKb = 4
     )
 
     process
@@ -313,14 +254,15 @@ function Get-CosmosAccessToken
 {
     <#
 .SYNOPSIS
-    Retrieves AAD token for authentication with selected CosmosDB
+    Retrieves an access token for the current CosmosLite connection.
 
 .DESCRIPTION
-    Retrieves AAD token for authentication with selected CosmosDB.
-    Can be used for debug purposes; module itself gets token as needed, including refreshing the tokens when they expire
+    Acquires a Microsoft Entra ID token for the configured Cosmos DB account.
+    This command is primarily useful for troubleshooting or diagnostics.
+    Most commands acquire and refresh tokens automatically when needed.
 
 .OUTPUTS
-    AuthenticationResult returned by AAD that contains access token and other information about logged-in identity.
+    Microsoft.Identity.Client.AuthenticationResult.
 
 .NOTES
     See https://learn.microsoft.com/en-us/dotnet/api/microsoft.identity.client.authenticationresult
@@ -330,7 +272,7 @@ function Get-CosmosAccessToken
 
     Description
     -----------
-    This command retrieves configuration for specified CosmosDB account and database, and retrieves access token for it using well-known clientId of Azure PowerShell
+    Creates a connection and returns the access token for that context.
 #>
 
     param
@@ -361,24 +303,24 @@ function Get-CosmosCollectionPartitionKeyRanges
 {
 <#
 .SYNOPSIS
-    Retrieves partition key ranges for the collection
+    Returns partition key ranges for a collection.
 
 .DESCRIPTION
-    Retrieves partition key ranges for the collection  
-    This helps with execution of cross partition queries
+    Retrieves partition key range metadata for the specified collection.
+    This is useful for advanced query scenarios, such as manual fan-out across ranges.
 
 .OUTPUTS
-    Response containing partition key ranges for collection.
+    CosmosLite response object containing partition key range metadata.
 
 .EXAMPLE
-    $rsp = Get-CosmosCollectioPartitionKeyRanges -Collection veryLargeCollection
+    $rsp = Get-CosmosCollectionPartitionKeyRanges -Collection veryLargeCollection
     foreach($id in $rsp.data.PartitionKeyRanges.Id) {
         Invoke-CosmosQuery -Query 'select * from c' -collection veryLargeCollection -PartitionKeyRangeId $id -AutoContinue
     }
 
     Description
     -----------
-    This command demonstrates how to use partition key ranges to query very large collection that would otherwise return error 'This cross-partition query cannot be served by gateway...'
+    Demonstrates using explicit partition key ranges for large cross-partition query workloads.
 #>
     param
     (
@@ -426,14 +368,14 @@ function Get-CosmosConnection
 {
 <#
 .SYNOPSIS
-    Returns most recently created Cosmos connection object
+    Returns the currently cached CosmosLite connection.
 
 .DESCRIPTION
-    Returns most recently created cosmos connection object that is cached inside the module.
-    Useful when you do not want to keep connection object in variable and reach for it only when needed
+    Returns the most recently created CosmosLite connection object stored in module scope.
+    Use this when you want to inspect or reuse the active context without storing it in a separate variable.
 
 .OUTPUTS
-    Connection configuration object.
+    CosmosLite.Connection object.
 
 #>
     param ()
@@ -447,14 +389,14 @@ function Get-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Retrieves document from the collection
+    Retrieves a document by id and partition key.
 
 .DESCRIPTION
-    Retrieves document from the collection by id and partition key
-    Command supports parallel processing.
+    Reads one or more documents from the specified collection.
+    Supports pipeline input and batched parallel request processing via -BatchSize.
 
 .OUTPUTS
-    Response containing retrieved document parsed from JSON format.
+    CosmosLite response object containing the requested document.
 
 .EXAMPLE
     $rsp = Get-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
@@ -462,7 +404,7 @@ function Get-CosmosDocument
 
     Description
     -----------
-    This command retrieves document with id = '123' and partition key 'test-docs' from collection 'docs'
+    Retrieves document 123 from collection docs in partition test-docs.
 #>
     param
     (
@@ -545,14 +487,15 @@ function Invoke-CosmosQuery
 {
 <#
 .SYNOPSIS
-    Queries collection for documents
+    Executes a SQL query against a Cosmos DB collection.
 
 .DESCRIPTION
-    Queries the collection and returns documents that fulfill query conditions.
-    Data returned may not be complete; in such case, returned object contains continuation token in 'Continuation' property. To receive more data, execute command again with parameter ContinuationToken set to value returned in Continuation field by previous command call.
+    Executes a query and returns matching documents.
+    Results can be paged. When more data is available, the response contains a continuation token.
+    Use -ContinuationToken to request the next page, or use -AutoContinue to iterate automatically.
     
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object for each query page.
 
 .EXAMPLE
     $query = "select * from c where c.itemType = @itemType"
@@ -574,7 +517,7 @@ function Invoke-CosmosQuery
 
     Description
     -----------
-    This command performs cross partition parametrized query and iteratively fetches all matching documents. Command also measures total RU consumption of the query
+    Performs a parameterized cross-partition query and manually follows continuation tokens.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity -CollectResponseHeaders
@@ -591,8 +534,7 @@ function Invoke-CosmosQuery
 
     Description
     -----------
-    This command performs cross partition parametrized query, potentially iterating over all partition key ranges, and fetches all matching documents, automatically paginating over all pages.  
-    Command also measures total RU consumption and populates 'x-ms-documentdb-query-metrics' header in the response across all subqueries
+    Performs a parameterized query and automatically iterates pages and partition ranges with -AutoContinue.
 #>
 
     [CmdletBinding()]
@@ -603,6 +545,7 @@ function Invoke-CosmosQuery
         $Query,
 
         [Parameter()]
+        [Alias('Parameters')]
         [System.Collections.Hashtable]
             #Query parameters if the query string contains parameter placeholders
             #Parameter names must start with '@' char
@@ -746,17 +689,16 @@ function Invoke-CosmosStoredProcedure
 {
 <#
 .SYNOPSIS
-    Call stored procedure
+    Executes a stored procedure.
 
 .DESCRIPTION
-    Calls stored procedure.
-    Command supports parallel processing.
-    Note: Stored procedures that return large dataset also support continuation token, however, continuation token must be passed as parameter, corretly passed to query inside store procedure logivc, and returned as part of stored procedure response.
-      This means that stored procedure logic is fully responsible for handling paging via continuation tokens. 
-      For details, see Cosmos DB server side programming reference
+    Calls a stored procedure in the specified collection and partition.
+    Supports pipeline input and batched parallel request processing.
+    Paging behavior for stored procedures is implemented by the stored procedure itself. If paging is needed,
+    the procedure must accept, propagate, and return continuation state explicitly.
     
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object containing stored procedure output.
 
 .EXAMPLE
     $params = @('123', 'test')
@@ -765,7 +707,7 @@ function Invoke-CosmosStoredProcedure
 
     Description
     -----------
-    This command calls stored procedure and shows result.
+    Executes a stored procedure with two input parameters and returns its response.
 #>
     [CmdletBinding()]
     param (
@@ -838,105 +780,19 @@ function Invoke-CosmosStoredProcedure
         }
     }
 }
-function New-CosmosDocumentUpdate
-{
-<#
-.SYNOPSIS
-    Constructs document update specification object expected by Update-CosmosDocument command
-
-.DESCRIPTION
-    Constructs document update description. Used together with Update-CosmosDocument and New-CosmoUpdateOperation commands.
-
-.OUTPUTS
-    Document update specification
-
-.EXAMPLE
-    $query = 'select c.id,c.pk from c where c.quantity < @threshold'
-    $queryParams = @{
-        '@threshold' = 10
-    }
-    $cntinuation = $null
-    do
-    {
-        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' ContinuationToken $continuation
-        if(!$rslt.IsSuccess)
-        {
-            throw $rslt.Data
-        }
-        $rslt.Data.Documents | Foreach-Object {
-            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute pk
-            $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
-        } | Update-CosmosDocument -Collection 'docs' -BatchSize 4
-        $continuation = $rslt.Continuation
-    }while($null -ne $continuation)
-
-    Description
-    -----------
-    This command increaments field 'quantity' by 50 on each documents that has value of this fields lower than 10
-    Update is performed in parallel; up to 4 updates are performed at the same time
-#>
-
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string]
-            #Id of the document to be replaced
-        $Id,
-
-        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
-        [string[]]
-            #Partition key of new document
-        $PartitionKey,
-
-        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
-        [PSCustomObject]
-            #Object representing document to create
-            #Command performs JSON serialization via ConvertTo-Json -Depth 99
-        $DocumentObject,
-
-        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
-        [string[]]
-            #attribute of DocumentObject used as partition key
-        $PartitionKeyAttribute,
-
-        [Parameter()]
-        [string]
-            #condition evaluated by the server that must be met to perform the updates
-        $Condition
-    )
-
-    process
-    {
-        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
-        {
-            $id = $DocumentObject.id
-            foreach($attribute in $PartitionKeyAttribute)
-            {
-                $PartitionKey+=$DocumentObject."$attribute"
-            }
-        }
-
-        [PSCustomObject]@{
-            PSTypeName = "CosmosLite.Update"
-            Id = $Id
-            PartitionKey = $PartitionKey
-            Condition = $Condition
-            Updates = @()
-        }
-    }
-}
 function New-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Inserts new document into collection
+    Creates a new document in a collection.
 
 .DESCRIPTION
-    Inserts new document into collection, or replaces existing when asked to perform upsert.
-    Command supports parallel processing.
+    Inserts a document into the target collection.
+    When -IsUpsert is specified, an existing document with the same id and partition key is replaced.
+    Supports pipeline input and batched parallel request processing.
 
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     $doc = [Ordered]@{
@@ -948,7 +804,7 @@ function New-CosmosDocument
 
     Description
     -----------
-    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Upserts a document with id 123 in collection docs and partition test-docs.
 #>
 
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
@@ -1068,17 +924,105 @@ function New-CosmosDocument
         }
     }
 }
+function New-CosmosDocumentUpdate
+{
+<#
+.SYNOPSIS
+    Creates a document update descriptor for partial updates.
+
+.DESCRIPTION
+    Builds a CosmosLite.Update object used by Update-CosmosDocument.
+    Combine it with one or more operations created by New-CosmosUpdateOperation.
+
+.OUTPUTS
+    CosmosLite.Update object.
+
+.EXAMPLE
+    $query = 'select c.id,c.pk from c where c.quantity < @threshold'
+    $queryParams = @{
+        '@threshold' = 10
+    }
+    $cntinuation = $null
+    do
+    {
+        $rslt = Invoke-CosmosQuery -Query $query -QueryParameters $queryParams -Collection 'docs' ContinuationToken $continuation
+        if(!$rslt.IsSuccess)
+        {
+            throw $rslt.Data
+        }
+        $rslt.Data.Documents | Foreach-Object {
+            $DocUpdate = $_ | New-CosmosDocumentUpdate -PartitiokKeyAttribute pk
+            $DocUpdate.Updates+=New-CosmosUpdateOperation -Operation Increament -TargetPath '/quantitiy' -Value 50
+        } | Update-CosmosDocument -Collection 'docs' -BatchSize 4
+        $continuation = $rslt.Continuation
+    }while($null -ne $continuation)
+
+    Description
+    -----------
+    Builds update payloads and increments quantity by 50 for matching documents.
+#>
+
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
+        [string]
+            #Id of the document to be replaced
+        $Id,
+
+        [Parameter(Mandatory, ParameterSetName = 'RawPayload')]
+        [string[]]
+            #Partition key of new document
+        $PartitionKey,
+
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'DocumentObject')]
+        [PSCustomObject]
+            #Object representing document to create
+            #Command performs JSON serialization via ConvertTo-Json -Depth 99
+        $DocumentObject,
+
+        [Parameter(Mandatory, ParameterSetName = 'DocumentObject')]
+        [string[]]
+            #attribute of DocumentObject used as partition key
+        $PartitionKeyAttribute,
+
+        [Parameter()]
+        [string]
+            #condition evaluated by the server that must be met to perform the updates
+        $Condition
+    )
+
+    process
+    {
+        if($PSCmdlet.ParameterSetName -eq 'DocumentObject')
+        {
+            $id = $DocumentObject.id
+            foreach($attribute in $PartitionKeyAttribute)
+            {
+                $PartitionKey+=$DocumentObject."$attribute"
+            }
+        }
+
+        [PSCustomObject]@{
+            PSTypeName = "CosmosLite.Update"
+            Id = $Id
+            PartitionKey = $PartitionKey
+            Condition = $Condition
+            Updates = @()
+        }
+    }
+}
 function New-CosmosUpdateOperation
 {
 <#
 .SYNOPSIS
-    Constructs document update description
+    Creates a single partial update operation.
 
 .DESCRIPTION
-    Constructs document update description. Used together with Update-CosmosDocument command.
+    Builds one CosmosLite.UpdateOperation entry for use in a CosmosLite.Update object.
+    Use this command with New-CosmosDocumentUpdate and Update-CosmosDocument.
     
 .OUTPUTS
-    Document update descriptor
+    CosmosLite.UpdateOperation object.
 
 .EXAMPLE
     $Updates = @()
@@ -1088,7 +1032,7 @@ function New-CosmosUpdateOperation
 
     Description
     -----------
-    This command replaces field 'content' and adds value to array field 'arrData' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs'
+    Creates multiple patch operations and applies them to a document.
 #>
 
     [CmdletBinding()]
@@ -1166,21 +1110,22 @@ function Remove-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Removes document from collection
+    Deletes a document from a collection.
 
 .DESCRIPTION
-    Removes document from collection.
-    Command supports parallel processing.
+    Removes one or more documents identified by id and partition key.
+    Supports pipeline input and batched parallel request processing.
+    Supports ShouldProcess (-WhatIf and -Confirm).
 
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     Remove-CosmosDocument -Id '123' -PartitionKey 'test-docs' -Collection 'docs'
 
     Description
     -----------
-    This command creates new document with id = '123' and partition key 'test-docs' collection 'docs', replacing potentially existing document with same id and partition key
+    Deletes document 123 from collection docs in partition test-docs.
 #>
 
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
@@ -1269,15 +1214,16 @@ function Set-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Replaces document with new document
+    Replaces an existing document.
 
 .DESCRIPTION
-    Replaces document data completely with new data. Document must exist for oepration to succeed.
-    When ETag parameter is specified, document is updated only if etag on server version of document is different.
-    Command supports parallel processing.
+    Replaces document content with the supplied payload.
+    The document must exist.
+    When -Etag is supplied, replacement is conditional on the current server ETag.
+    Supports pipeline input and batched parallel request processing.
     
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     $doc = [Ordered]@{
@@ -1289,7 +1235,7 @@ function Set-CosmosDocument
 
     Description
     -----------
-    This command replaces entire document with ID '123' and partition key 'test-docs' in collection 'docs' with new content
+    Replaces the full document body for document 123 in collection docs.
 #>
     [CmdletBinding()]
     param (
@@ -1394,21 +1340,21 @@ function Set-CosmosRetryCount
 {
 <#
 .SYNOPSIS
-    Sets up maximum number of retries when requests are throttled
+    Sets the retry count for throttled requests.
 
 .DESCRIPTION
-    When requests are throttled (server return http 429 code), ruuntime retries the operation for # of times specified here. Default number of retries is 10.
-    Waiting time between operations is specified by server together with http 429 response
+    Updates the maximum retry attempts used when Cosmos DB responds with HTTP 429 (Too Many Requests).
+    Retry delay is taken from server-provided headers.
     
 .OUTPUTS
-    No output
+    None.
 
 .EXAMPLE
     Set-CosmosRetryCount -RetryCount 20
 
     Description
     -----------
-    This command sets maximus retries for throttled requests to 20
+    Sets the throttling retry limit to 20 for the active context.
 #>
 
     [CmdletBinding()]
@@ -1434,15 +1380,15 @@ function Update-CosmosDocument
 {
 <#
 .SYNOPSIS
-    Updates content of the document
+    Applies partial updates to a document.
 
 .DESCRIPTION
-    Updates document data according to update operations provided.
-    This command uses Cosmos DB Partial document update API to perform changes on server side without the need to download the document to client, modify it on client side and upload back to server
-    Command supports parallel processing.
+    Applies patch operations to documents by using the Cosmos DB partial document update API.
+    This avoids downloading the full document, editing client-side, and replacing the complete payload.
+    Supports pipeline input, batched parallel processing, and ShouldProcess (-WhatIf and -Confirm).
 
 .OUTPUTS
-    Response describing result of operation
+    CosmosLite response object.
 
 .EXAMPLE
     $DocUpdate = New-CosmosDocumentUpdate -Id '123' -PartitionKey 'test-docs'
@@ -1451,7 +1397,7 @@ function Update-CosmosDocument
 
     Description
     -----------
-    This command replaces field 'content' in root of the document with ID '123' and partition key 'test-docs' in collection 'docs' with new value
+    Applies a single patch operation to update the content property of a document.
 #>
 
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
@@ -1525,9 +1471,25 @@ function Update-CosmosDocument
         }
     }
 }
-#endregion Public
+#endregion Public commands
+#region Internal commands
+class CosmosLiteException : Exception {
+    [string] $Code
+    [PSCustomObject] $Request
 
-#region Internal
+    CosmosLiteException($Code, $Message) : base($Message) {
+        $this.Code = $code
+        $this.Request = $null
+    }
+    CosmosLiteException($Code, $Message, $request) : base($Message) {
+        $this.Code = $code
+        $this.Request = $request
+    }
+
+    [string] ToString() {
+        return "$($this.Code): $($this.Message)"
+     }
+}
 function Get-CosmosRequest
 {
     param(
@@ -1928,5 +1890,26 @@ function SendRequestInternal
         }
     }
 }
-#endregion Internal
-
+#endregion Internal commands
+#region Module initialization
+if($PSEdition -eq 'Desktop')
+{
+    add-type -AssemblyName System.Collections
+    add-type -AssemblyName system.web
+    add-type -AssemblyName System.Web.Extensions
+    $script:DesktopSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
+    $script:DesktopSerializer.MaxJsonLength = [int]::MaxValue
+    $script:DesktopSerializer.RecursionLimit = 100
+}
+else {
+    add-type -AssemblyName System.Collections
+    add-type -AssemblyName System.Text.Json
+    $Script:JsonSerializerOptions = [System.Text.Json.JsonSerializerOptions]@{
+        PropertyNameCaseInsensitive = $true
+        PropertyNamingPolicy = [System.Text.Json.JsonNamingPolicy]::CamelCase
+        ReadCommentHandling = [System.Text.Json.JsonCommentHandling]::Skip
+        AllowTrailingCommas = $true
+        MaxDepth = 100
+    }
+}
+#endregion Module initialization

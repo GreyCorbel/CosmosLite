@@ -20,18 +20,23 @@ jobs:
   publishToGallery:
     # The type of runner that the job will run on
     runs-on: windows-latest
-
+    env: 
+        MODULE_NAME: CosmosLite
+      
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    - name: Checkout
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-    - name: Build
+    - name: Copy License
       shell: pwsh
       run: |
-        Copy-Item -Path "$env:GITHUB_WORKSPACE\LICENSE" -Destination "$env:GITHUB_WORKSPACE\Module\CosmosLite\LICENSE.txt" -Force
-        &"$env:GITHUB_WORKSPACE\Commands\BuildModule.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+        $moduleName = $env:MODULE_NAME
+        Copy-Item -Path "$env:GITHUB_WORKSPACE\LICENSE" -Destination "$env:GITHUB_WORKSPACE\Module\$moduleName\LICENSE.txt" -Force
+
+    - name: Build Module
+      uses: GreyCorbel/PsModuleActions/build-module@v2
+      with:
+        module-name: ${{ env.MODULE_NAME }}
 
     - name: Install prerequisites
       shell: pwsh

@@ -27,7 +27,7 @@ Author = 'Jiri Formacek'
 CompanyName = 'GreyCorbel Solutions'
 
 # Copyright statement for this module
-Copyright = '(c) 2022 - 2024 Jiri Formacek, GreyCorbel Solutions. All rights reserved.'
+Copyright = '(c) 2022 - 2026 Jiri Formacek, GreyCorbel Solutions. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'Provides commands that allow easy manipulation with data in Cosmos DB'
@@ -69,7 +69,7 @@ FormatsToProcess = @('CosmosLite.format.ps1xml')
 NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @('Assert-CosmosResult','Connect-Cosmos','Get-CosmosAccessToken','Get-CosmosCollectionPartitionKeyRanges','Get-CosmosConnection','Get-CosmosDocument','Invoke-CosmosQuery','Invoke-CosmosStoredProcedure','New-CosmosDocumentUpdate','New-CosmosDocuument','New-CosmosUpdateOperation','Remove-CosmosDocument','Set-CosmosDocument','Set-CosmosRetryCount','Update-CosmosDocument')
+FunctionsToExport = @('Assert-CosmosResult','Connect-Cosmos','Get-CosmosAccessToken','Get-CosmosCollectionPartitionKeyRanges','Get-CosmosConnection','Get-CosmosDocument','Invoke-CosmosQuery','Invoke-CosmosStoredProcedure','New-CosmosDocument','New-CosmosDocumentUpdate','New-CosmosUpdateOperation','Remove-CosmosDocument','Set-CosmosDocument','Set-CosmosRetryCount','Update-CosmosDocument')
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
@@ -124,5 +124,6 @@ PrivateData = @{
 
     }
 }
+
 
 
