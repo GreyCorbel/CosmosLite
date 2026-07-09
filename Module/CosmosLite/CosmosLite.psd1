@@ -51,7 +51,7 @@ CLRVersion = ''
 ProcessorArchitecture = ''
 
 # Modules that must be imported into the global environment prior to importing this module
-RequiredModules = @(@{ModuleName="AadAuthenticationFactory"; ModuleVersion="3.1.2"; GUID='9d860f96-4bde-41d3-890b-1a3f51c34d68'})
+# RequiredModules = @()
 
 # Assemblies that must be loaded prior to importing this module
 RequiredAssemblies = @()
@@ -103,7 +103,7 @@ PrivateData = @{
         ProjectUri = 'https://github.com/greycorbel/CosmosLite'
 
         # Prerelease string of this module
-        Prerelease = 'beta1'
+        Prerelease = 'beta2'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         RequireLicenseAcceptance = $false
@@ -113,6 +113,7 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         # ReleaseNotes = ''
+        ExternalModuleDependencies = @('AadAuthenticationFactory')
 
     } # End of PSData hashtable
     
@@ -124,6 +125,7 @@ PrivateData = @{
 
     }
 }
+
 
 
 

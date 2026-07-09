@@ -38,11 +38,6 @@ jobs:
       with:
         module-name: ${{ env.MODULE_NAME }}
 
-    - name: Install prerequisites
-      shell: pwsh
-      run: |
-        Install-Module AadAuthenticationFactory -AllowPrerelease -Force -Scope CurrentUser
-      
     - name: Install AzureSignTool
       shell: pwsh
       run: |

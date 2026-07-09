@@ -1632,6 +1632,7 @@ function InvokeCosmosWindowInternal
             #CosmosLiteRequest to start. Omit (or pass $null) to switch to drain mode.
         $rq = $null,
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [System.Collections.Generic.List[object]]$InFlight,
         [Parameter()]
         [int]
