@@ -103,7 +103,7 @@ PrivateData = @{
         ProjectUri = 'https://github.com/greycorbel/CosmosLite'
 
         # Prerelease string of this module
-        Prerelease = 'beta2'
+        #Prerelease = 'beta2'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         RequireLicenseAcceptance = $false
@@ -125,6 +125,7 @@ PrivateData = @{
 
     }
 }
+
 
 
 

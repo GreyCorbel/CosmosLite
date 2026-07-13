@@ -9,25 +9,124 @@ function Connect-Cosmos
     The command does not send a network request by itself; authentication and connection happen on the first data operation.
     Supports interactive public client auth, confidential client auth, resource owner password flow, managed identity, or a prebuilt authentication factory.
 
+.PARAMETER AccountName
+    The name of the Azure Cosmos DB account to connect to.
+
+.PARAMETER Database
+    The name of the database within the Cosmos DB account.
+
+.PARAMETER Factory
+    An existing authentication factory object to use instead of creating a new one. Used with the ExistingFactory parameter set.
+
+.PARAMETER TenantId
+    The ID of the Azure Active Directory tenant where the user will be authenticated. Can be a tenant ID (GUID) or a registered DNS domain.
+    Not required when using managed identity, but mandatory for public client, confidential client, and resource owner password flows.
+
+.PARAMETER ClientId
+    The client ID (application ID) of the Azure AD application used to obtain tokens for Cosmos DB.
+    Default: The well-known client ID for Azure PowerShell, which has pre-configured delegated permissions to access Cosmos DB resources.
+
+.PARAMETER RedirectUri
+    The redirect URI for the client application, used in interactive authentication flows.
+    Default: The default MSAL (Microsoft Authentication Library) redirect URI.
+
+.PARAMETER Scope
+    A custom scope to request tokens for instead of the default scope derived from the account name.
+    Example: https://cosmos.azure.com/.default
+
+.PARAMETER ClientSecret
+    The client secret for the application ID. Used for confidential client authentication to obtain tokens as an application rather than as a user.
+
+.PARAMETER X509Certificate
+    An X.509 certificate for the application ID. Used for certificate-based confidential client authentication.
+
+.PARAMETER ResourceOwnerCredential
+    A PSCredential object containing the resource owner's username and password.
+    Used for resource owner password flow (ROPC) authentication.
+    Note: Does not work with federated authentication. See https://learn.microsoft.com/azure/active-directory/develop/v2-oauth-ropc
+
+.PARAMETER Environment
+    The Azure cloud environment to connect to. Valid values: PublicCloud, USGovernment, China.
+    Default: PublicCloud
+    Determines the appropriate REST API endpoints and login endpoints for the specified cloud.
+
+.PARAMETER LoginApi
+    The Azure Active Directory authentication endpoint URL.
+    Default: Automatically determined based on the selected Environment.
+
+.PARAMETER AuthMode
+    The authentication mode for public client flows. Valid values: Interactive, DeviceCode, WIA (Windows Integrated Authentication), WAM (Web Account Manager).
+    Required when using the PublicClient parameter set.
+
+.PARAMETER UserNameHint
+    A username hint to pre-populate in interactive authentication flows.
+
+.PARAMETER UseManagedIdentity
+    When specified, attempts to obtain authentication parameters from the environment and retrieves tokens from the Azure managed identity endpoint.
+    Used for authentication in Azure-hosted environments with managed identities enabled.
+
+.PARAMETER CollectResponseHeaders
+    When specified, collects all response headers from Cosmos DB API responses.
+
+.PARAMETER Preview
+    When specified, uses the preview Cosmos DB API version (2020-07-15) instead of the stable version (2018-12-31).
+
+.PARAMETER Proxy
+    A System.Net.WebProxy object if the connection to Azure must route through a proxy server.
+
+.PARAMETER RetryCount
+    The maximum number of automatic retries when the server returns HTTP 429 (Too Many Requests).
+    Default: 10
+
+.PARAMETER MaxContinuationTokenSizeInKb
+    The maximum size of continuation tokens in kilobytes.
+    Default: 4 KB
+    Decrease this value if experiencing 'Request too large' errors.
+
 .OUTPUTS
-    CosmosLite.Connection object.
+    CosmosLite.Connection object with the following properties:
+    - PSTypeName: CosmosLite.Connection
+    - AccountName: The Cosmos DB account name
+    - Endpoint: The full endpoint URI for the database
+    - RetryCount: Configured retry count
+    - Session: Cached session data
+    - CollectResponseHeaders: Whether response headers are collected
+    - RequiredScopes: OAuth scopes for authentication
+    - AuthFactory: The authentication factory object
+    - ApiVersion: The API version being used
+    - HttpClient: The HTTP client for requests
+    - MaxContinuationTokenSizeInKb: Maximum continuation token size
 
 .NOTES
-    The most recently created connection is cached in module scope and used automatically by other commands when -Context is omitted.
+    The most recently created connection is cached in module scope and used automatically by other commands when the -Context parameter is omitted.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode Interactive
 
     Description
     -----------
-    Creates a connection context using delegated interactive authentication.
+    Creates a connection context using delegated interactive authentication with the specified tenant and interactive authentication mode.
 
 .EXAMPLE
     Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -UseManagedIdentity
 
     Description
     -----------
-    Creates a connection context using the local managed identity endpoint.
+    Creates a connection context using the local managed identity endpoint. Useful when running in Azure-hosted environments like Azure Functions or App Service.
+
+.EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -ClientId 'app-id' -ClientSecret 'secret'
+
+    Description
+    -----------
+    Creates a connection context using confidential client authentication with a client secret (application credentials).
+
+.EXAMPLE
+    Connect-Cosmos -AccountName myCosmosDbAccount -Database myCosmosDb -TenantId mydomain.com -AuthMode DeviceCode
+
+    Description
+    -----------
+    Creates a connection context using device code flow, useful for scenarios where an interactive browser is not available.
 #>
 
     param
@@ -50,10 +149,10 @@ function Connect-Cosmos
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
-        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPassword')]
         [string]
-            #Id of tenant where to autenticate the user. Can be tenant id, or any registerd DNS domain
-            #Not necessary when connecting with Managed Identity, otherwise ncesessary
+            #Id of tenant where to authenticate the user. Can be tenant id, or any registered DNS domain
+            #Not necessary when connecting with Managed Identity, otherwise necessary
         $TenantId,
 
         [Parameter()]
@@ -86,7 +185,7 @@ function Connect-Cosmos
             #Used to get access as application rather than as calling user
         $X509Certificate,
 
-        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPassword')]
         [pscredential]
             #Resource Owner username and password
             #Used to get access as user
@@ -94,10 +193,15 @@ function Connect-Cosmos
         $ResourceOwnerCredential,
 
         [Parameter()]
+        [ValidateSet('PublicCloud', 'USGovernment', 'China')]
+        [string]
+            #cloud environment to connect to. Used to determine the correct REST API endpoint and login endpoint for the cloud. Default is PublicCloud.
+            $Environment = 'PublicCloud',
+        [Parameter()]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
-        $LoginApi = 'https://login.microsoftonline.com',
+        $LoginApi,
         
         [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
         [ValidateSet('Interactive', 'DeviceCode', 'WIA', 'WAM')]
@@ -126,7 +230,7 @@ function Connect-Cosmos
         [Parameter(ParameterSetName = 'PublicClient')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithSecret')]
         [Parameter(ParameterSetName = 'ConfidentialClientWithCertificate')]
-        [Parameter(ParameterSetName = 'ResourceOwnerPasssword')]
+        [Parameter(ParameterSetName = 'ResourceOwnerPassword')]
         [System.Net.WebProxy]
             #WebProxy object if connection to Azure has to go via proxy server
         $Proxy = $null,
@@ -148,15 +252,32 @@ function Connect-Cosmos
         {
             [system.net.webrequest]::defaultwebproxy = $Proxy
         }
-
+        switch($Environment)
+        {
+            'PublicCloud' {
+                $LoginApi = 'https://login.microsoftonline.com'
+                $accountEndpoint = "https://$accountName.documents.azure.com"
+                break;
+            }
+            'USGovernment' {
+                $LoginApi = 'https://login.microsoftonline.us'
+                $accountEndpoint = "https://$accountName.documents.azure.us"
+                break;
+            }
+            'China' {
+                $LoginApi = 'https://login.chinacloudapi.cn'
+                $accountEndpoint = "https://$accountName.documents.azure.cn"
+                break;
+            }
+        }
         $script:Configuration = [PSCustomObject]@{
             PSTypeName = "CosmosLite.Connection"
             AccountName = $AccountName
-            Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
+            Endpoint = "$accountEndpoint/dbs/$Database"
             RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
-            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
+            RequiredScopes = @("$accountEndpoint/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
             ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
             HttpClient = new-object System.Net.Http.HttpClient
@@ -190,7 +311,7 @@ function Connect-Cosmos
                     $Factory = New-AadAuthenticationFactory -ClientId $clientId -UseManagedIdentity -Proxy $proxy
                     break;
                 }
-                'ResourceOwnerPasssword' {
+                'ResourceOwnerPassword' {
                     $Factory = New-AadAuthenticationFactory -TenantId $TenantId -ClientId $ClientId -LoginApi $LoginApi -ResourceOwnerCredential $ResourceOwnerCredential -Proxy $proxy
                     break;
                 }

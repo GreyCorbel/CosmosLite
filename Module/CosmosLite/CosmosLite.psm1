@@ -141,10 +141,15 @@ function Connect-Cosmos
         $ResourceOwnerCredential,
 
         [Parameter()]
+        [ValidateSet('PublicCloud', 'USGovernment', 'China')]
+        [string]
+            #cloud environment to connect to. Used to determine the correct REST API endpoint and login endpoint for the cloud. Default is PublicCloud.
+            $Environment = 'PublicCloud',
+        [Parameter()]
         [string]
             #AAD auth endpoint
             #Default: endpoint for public cloud
-        $LoginApi = 'https://login.microsoftonline.com',
+        $LoginApi,
         
         [Parameter(Mandatory, ParameterSetName = 'PublicClient')]
         [ValidateSet('Interactive', 'DeviceCode', 'WIA', 'WAM')]
@@ -195,15 +200,32 @@ function Connect-Cosmos
         {
             [system.net.webrequest]::defaultwebproxy = $Proxy
         }
-
+        switch($Environment)
+        {
+            'PublicCloud' {
+                $LoginApi = 'https://login.microsoftonline.com'
+                $accountEndpoint = "https://$accountName.documents.azure.com"
+                break;
+            }
+            'USGovernment' {
+                $LoginApi = 'https://login.microsoftonline.us'
+                $accountEndpoint = "https://$accountName.documents.azure.us"
+                break;
+            }
+            'China' {
+                $LoginApi = 'https://login.chinacloudapi.cn'
+                $accountEndpoint = "https://$accountName.documents.azure.cn"
+                break;
+            }
+        }
         $script:Configuration = [PSCustomObject]@{
             PSTypeName = "CosmosLite.Connection"
             AccountName = $AccountName
-            Endpoint = "https://$accountName`.documents.azure.com/dbs/$Database"
+            Endpoint = "$accountEndpoint/dbs/$Database"
             RetryCount = $RetryCount
             Session = @{}
             CollectResponseHeaders = $CollectResponseHeaders
-            RequiredScopes = @("https://$accountName`.documents.azure.com/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
+            RequiredScopes = @("$accountEndpoint/.default")    #we keep scopes separately to override any default scopes set on existing factory passed 
             AuthFactory = $null
             ApiVersion = $(if($Preview) {'2020-07-15'} else {'2018-12-31'})  #we don't use PS7 ternary operator to be compatible wirh PS5
             HttpClient = new-object System.Net.Http.HttpClient
